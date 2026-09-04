@@ -2310,7 +2310,7 @@ details.hist-arch.hide{display:none;}
       stock o hueco libre como sistema de apertura se suman <strong>3 €/frente</strong>; con tirador del
       cliente no hay recargo. Con <strong>hueco libre</strong> cada frente pierde <strong>22 mm de alto</strong>
       y el techo se retranquea <strong>30 mm de fondo</strong> para dejar sitio a los dedos. Con <strong>un solo
-      cajón</strong> el frente mide como mínimo <strong>180 mm</strong> (nominal). Su despiece va en <strong>grupos aparte</strong> — nunca se mezcla con el
+      cajón</strong> el frente mide como mínimo <strong>180 mm</strong> (nominal) y se cobra <strong>como si fueran dos</strong>. Su despiece va en <strong>grupos aparte</strong> — nunca se mezcla con el
       corte y canteado del pedido aunque coincida el material — y genera sus propias listas de corte y
       archivos Cutty. Guías de 450 y 500 mm en stock; las de 400 y 550 mm son bajo pedido.
     </div>
@@ -2948,7 +2948,7 @@ details.hist-arch.hide{display:none;}
 // ========== 1. CONSTANTES Y ESTADO ==========
 // Versión de la app: sube con cada despliegue. Se muestra en Configuración
 // para poder comprobar en el dispositivo qué versión está ejecutándose.
-const APP_BUILD = '2026-09-04.1';
+const APP_BUILD = '2026-09-04.2';
 
 const STORAGE = {
   TABLEROS: 'ag5_corte_tableros',
@@ -6052,6 +6052,8 @@ function importarFotoAPiezas() {
 // f50 = fondo 0–50 cm, f60 = fondo 51–60 cm. Columnas = 2..7 cajones.
 // Medida de ancho no listada → se salta a la INMEDIATA SUPERIOR.
 // Al precio resultante se le suman 10 € POR CAJÓN (p. ej. 4 cajones → +40 €).
+// Cajonera de UN cajón (sep-2026): se cobra COMO SI FUERAN DOS (columna de
+// 2 cajones + 10 €/cajón × 2). El recargo de tirador va por frente REAL (1).
 // Recargo de TIRADOR: +3 € por frente SOLO cuando el sistema de apertura es
 // tirador de stock o hueco libre (mecanizado/suministro nuestro). Si el
 // tirador lo pone el cliente, NO se aplica.
@@ -6060,6 +6062,7 @@ const CAJ_TARIFA = {
   anchosCm: [40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100],
   minCajones: 2,
   maxCajones: 7,
+  minCajonesFacturables: 1,  // 1 cajón se factura como 2 (ver arriba)
   recargoPorCajon: 10.00,   // se suma al precio final: 10 € por cada cajón
   recargoPorFrenteTirador: 3.00, // +3 €/frente con tirador stock o hueco libre
   precios: {
@@ -6249,24 +6252,26 @@ function calcularPrecioCajonera(caj) {
   const fondoCm = (caj.fondo || 0) / 10;
   const banda = fondoCm <= 50 ? 'f50' : (fondoCm <= 60 ? 'f60' : null);
   const n = m.nCajones;
+  // Nº de cajones a efectos de TARIFA: 1 cajón se cobra como 2.
+  const nTarifa = Math.max(n, CAJ_TARIFA.minCajones);
 
   if (!anchoSel) avisos.push({ tipo: 'err', txt: `Ancho ${caj.ancho} mm fuera de tarifa (máx. 100 cm). Indica un precio manual.` });
   if (!banda) avisos.push({ tipo: 'err', txt: `Fondo ${caj.fondo} mm fuera de tarifa (máx. 60 cm). Indica un precio manual.` });
-  if (n < CAJ_TARIFA.minCajones || n > CAJ_TARIFA.maxCajones) {
-    avisos.push({ tipo: 'err', txt: `La tarifa cubre de ${CAJ_TARIFA.minCajones} a ${CAJ_TARIFA.maxCajones} cajones (esta lleva ${n}). Indica un precio manual.` });
+  if (n < CAJ_TARIFA.minCajonesFacturables || n > CAJ_TARIFA.maxCajones) {
+    avisos.push({ tipo: 'err', txt: `La tarifa cubre de ${CAJ_TARIFA.minCajonesFacturables} a ${CAJ_TARIFA.maxCajones} cajones (esta lleva ${n}). Indica un precio manual.` });
   }
-  if (!anchoSel || !banda || n < CAJ_TARIFA.minCajones || n > CAJ_TARIFA.maxCajones) {
+  if (!anchoSel || !banda || n < CAJ_TARIFA.minCajonesFacturables || n > CAJ_TARIFA.maxCajones) {
     return { unidad: null, total: null, avisos, detalle: 'sin precio de tarifa' };
   }
 
-  let base = CAJ_TARIFA.precios[anchoSel][banda][n - CAJ_TARIFA.minCajones];
-  const partes = [`tarifa ${anchoSel}×${banda === 'f50' ? '0–50' : '51–60'} · ${n} cajones`];
+  let base = CAJ_TARIFA.precios[anchoSel][banda][nTarifa - CAJ_TARIFA.minCajones];
+  const partes = [`tarifa ${anchoSel}×${banda === 'f50' ? '0–50' : '51–60'} · ${nTarifa} cajones${n === 1 ? ' (1 cajón se cobra como 2)' : ''}`];
   if (anchoSel !== anchoCm) partes[0] += ` (ancho ${anchoCm} → ${anchoSel})`;
 
   let unidad = Math.round(base * 100) / 100;
   // Recargo fijo por cajón (se suma al final)
-  unidad = Math.round((unidad + CAJ_TARIFA.recargoPorCajon * n) * 100) / 100;
-  partes.push(`+ ${CAJ_TARIFA.recargoPorCajon.toFixed(2).replace('.', ',')} €/cajón × ${n}`);
+  unidad = Math.round((unidad + CAJ_TARIFA.recargoPorCajon * nTarifa) * 100) / 100;
+  partes.push(`+ ${CAJ_TARIFA.recargoPorCajon.toFixed(2).replace('.', ',')} €/cajón × ${nTarifa}`);
   // Recargo de tirador: +3 €/frente SOLO con tirador de stock o hueco libre.
   // Con tirador del cliente no se aplica.
   if (caj.tirador === 'stock' || caj.tirador === 'hueco') {
