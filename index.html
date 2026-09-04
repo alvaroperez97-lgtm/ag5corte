@@ -2308,7 +2308,9 @@ details.hist-arch.hide{display:none;}
       <strong>Cómo funciona:</strong> las cajoneras se cobran <strong>como unidad</strong> según la tarifa
       (medida no listada → la inmediata superior; fondo 0–50 / 51–60, más 10 €/cajón). Con tirador de
       stock o hueco libre como sistema de apertura se suman <strong>3 €/frente</strong>; con tirador del
-      cliente no hay recargo. Su despiece va en <strong>grupos aparte</strong> — nunca se mezcla con el
+      cliente no hay recargo. Con <strong>hueco libre</strong> cada frente pierde <strong>22 mm de alto</strong>
+      y el techo se retranquea <strong>30 mm de fondo</strong> para dejar sitio a los dedos. Con <strong>un solo
+      cajón</strong> el frente mide como mínimo <strong>180 mm</strong> (nominal). Su despiece va en <strong>grupos aparte</strong> — nunca se mezcla con el
       corte y canteado del pedido aunque coincida el material — y genera sus propias listas de corte y
       archivos Cutty. Guías de 450 y 500 mm en stock; las de 400 y 550 mm son bajo pedido.
     </div>
@@ -2365,7 +2367,7 @@ details.hist-arch.hide{display:none;}
           <select id="caj-f-tirador" onchange="cajFormRefrescar()">
             <option value="stock">Tirador stock (−4 mm al alto · +3 €/frente)</option>
             <option value="cliente">Tirador del cliente (−2 mm al alto · sin recargo)</option>
-            <option value="hueco">Hueco libre (−2 mm al alto · +3 €/frente)</option>
+            <option value="hueco">Hueco libre (−22 mm al alto · techo −30 mm de fondo · +3 €/frente)</option>
           </select>
         </label>
         <label class="caj-lbl">Fondo de guías
@@ -2946,7 +2948,7 @@ details.hist-arch.hide{display:none;}
 // ========== 1. CONSTANTES Y ESTADO ==========
 // Versión de la app: sube con cada despliegue. Se muestra en Configuración
 // para poder comprobar en el dispositivo qué versión está ejecutándose.
-const APP_BUILD = '2026-08-12.2';
+const APP_BUILD = '2026-09-04.1';
 
 const STORAGE = {
   TABLEROS: 'ag5_corte_tableros',
@@ -6082,7 +6084,10 @@ const CAJ_CTE = {
   grueso: 16,            // todo el armazón y frentes van en melamina de 16
   holguraAnchoFrente: 3, // el frente mide ancho cajonera − 3
   descAltoTiradorStock: 4,   // tirador stock: alto frente = nominal − 4
-  descAltoOtros: 2,          // tirador cliente / hueco libre: nominal − 2
+  descAltoOtros: 2,          // tirador del cliente: nominal − 2
+  descAltoHueco: 22,         // hueco libre: nominal − 22 (hueco para los dedos)
+  descFondoTechoHueco: 30,   // hueco libre: el techo se retranquea 30 de fondo
+  minFrenteUnCajon: 180,     // cajonera de UN cajón: frente mínimo 180 (nominal)
   descFondoArmazon: 25,  // fondo armazón = fondo − 20 (frente) − 5 (trasera clavada)
   descAnchoInterior: 32, // base/techo/zócalo = ancho − 16 − 16 (los dos costados)
   descFondoBaseCajon: 8, // fondo base cajón = fondo de guía − 8
@@ -6107,7 +6112,12 @@ function medidasCajonera(caj) {
     altoTotal: frentes.reduce((s, f) => s + f, 0) + zocalo,
     fondoArmazon: (caj.fondo || 0) - CAJ_CTE.descFondoArmazon,
     anchoInterior: (caj.ancho || 0) - CAJ_CTE.descAnchoInterior,
-    descAltoFrente: caj.tirador === 'stock' ? CAJ_CTE.descAltoTiradorStock : CAJ_CTE.descAltoOtros
+    descAltoFrente: caj.tirador === 'stock' ? CAJ_CTE.descAltoTiradorStock
+      : (caj.tirador === 'hueco' ? CAJ_CTE.descAltoHueco : CAJ_CTE.descAltoOtros),
+    // Fondo del techo: con hueco libre se retranquea 30 mm para que quepan
+    // los dedos al abrir el cajón de arriba; con tirador va a fondo de armazón.
+    fondoTecho: (caj.fondo || 0) - CAJ_CTE.descFondoArmazon - (caj.tirador === 'hueco' ? CAJ_CTE.descFondoTechoHueco : 0),
+    huecoLibre: caj.tirador === 'hueco'
   };
 }
 
@@ -6155,8 +6165,9 @@ function despieceCajonera(caj, idx) {
   push(2, m.fondoArmazon, m.altoTotal, 2, 1, 'Costado');
 
   // BASE y TECHO: ancho interior × fondo armazón. Solo canto el frente (1 largo).
+  // Con hueco libre el techo va 30 mm más corto de fondo (hueco para los dedos).
   push(1, m.anchoInterior, m.fondoArmazon, 1, 0, 'Base');
-  push(1, m.anchoInterior, m.fondoArmazon, 1, 0, 'Techo');
+  push(1, m.anchoInterior, m.fondoTecho, 1, 0, m.huecoLibre ? 'Techo (−30 hueco dedos)' : 'Techo');
 
   // ZÓCALO (si lleva): ancho interior × alto zócalo. 1 largo canteado.
   if (m.zocalo > 0) push(1, m.anchoInterior, m.zocalo, 1, 0, `Zócalo ${m.zocalo}`);
@@ -6217,9 +6228,12 @@ function calcularPrecioCajonera(caj) {
   if (m.zocalo > 0 && (m.zocalo < 20 || m.zocalo > 120)) {
     avisos.push({ tipo: 'warn', txt: 'La tarifa contempla zócalos de 2 a 12 cm. Revisa la medida.' });
   }
+  if (m.nCajones === 1 && m.frentes[0] > 0 && m.frentes[0] < CAJ_CTE.minFrenteUnCajon) {
+    avisos.push({ tipo: 'err', txt: `Cajonera de un solo cajón: el frente mide como mínimo ${CAJ_CTE.minFrenteUnCajon} mm (18 cm). Ahora tiene ${m.frentes[0]} mm.` });
+  }
   m.frentes.forEach((f, i) => {
     if (f > 0 && f - m.descAltoFrente < 60) {
-      avisos.push({ tipo: 'warn', txt: `El frente ${i + 1} queda muy bajo (${f - m.descAltoFrente} mm reales).` });
+      avisos.push({ tipo: 'warn', txt: `El frente ${i + 1} queda muy bajo (${f - m.descAltoFrente} mm reales${m.huecoLibre ? ', descontados los 22 del hueco libre' : ''}).` });
     }
   });
 
@@ -6389,11 +6403,11 @@ function cajSetNumFrentes(n, valores) {
   const vals = valores || actuales;
   let html = '';
   for (let i = 0; i < n; i++) {
-    const v = vals[i] != null && vals[i] !== '' ? vals[i] : 160;
+    const v = vals[i] != null && vals[i] !== '' ? vals[i] : (n === 1 ? CAJ_CTE.minFrenteUnCajon : 160);
     html += `
       <div class="caj-frente-row">
         <span class="caj-frente-num">${i + 1}º${i === 0 ? ' (arriba)' : (i === n - 1 ? ' (abajo)' : '')}</span>
-        <input type="number" min="60" step="1" value="${v}" data-frente="${i}" oninput="cajFormRefrescar()"> mm
+        <input type="number" min="${n === 1 ? CAJ_CTE.minFrenteUnCajon : 60}" step="1" value="${v}" data-frente="${i}" oninput="cajFormRefrescar()"> mm
       </div>`;
   }
   cont.innerHTML = html;
@@ -6579,8 +6593,14 @@ function renderCroquisCajonera(caj) {
   let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:${W}px;">`;
 
   if (fondo > 0) {
-    // TECHO (paralelogramo superior)
-    svg += `<polygon points="${P(x0, yF)} ${P(x0 + bw, yF)} ${P(x0 + bw + dpx, yF - dpy)} ${P(x0 + dpx, yF - dpy)}" fill="#ecd9b2" stroke="#8a5a2b" stroke-width="1.2"/>`;
+    // TECHO (paralelogramo superior). Con hueco libre arranca 30 mm más
+    // atrás: la franja delantera se pinta oscura (es el hueco para los dedos).
+    const rt = m.huecoLibre ? Math.min(CAJ_CTE.descFondoTechoHueco, fondo) : 0;
+    const rx = rt * K * uxP * esc, ry = rt * K * uyP * esc;
+    if (rt > 0) {
+      svg += `<polygon points="${P(x0, yF)} ${P(x0 + bw, yF)} ${P(x0 + bw + rx, yF - ry)} ${P(x0 + rx, yF - ry)}" fill="#5c3d1e" stroke="#8a5a2b" stroke-width="1"/>`;
+    }
+    svg += `<polygon points="${P(x0 + rx, yF - ry)} ${P(x0 + bw + rx, yF - ry)} ${P(x0 + bw + dpx, yF - dpy)} ${P(x0 + dpx, yF - dpy)}" fill="#ecd9b2" stroke="#8a5a2b" stroke-width="1.2"/>`;
     // COSTADO DERECHO (paralelogramo lateral)
     svg += `<polygon points="${P(x0 + bw, yF)} ${P(x0 + bw + dpx, yF - dpy)} ${P(x0 + bw + dpx, yF - dpy + bh)} ${P(x0 + bw, yF + bh)}" fill="#c9a86e" stroke="#8a5a2b" stroke-width="1.2"/>`;
   }
@@ -6637,7 +6657,7 @@ function renderCroquisCajonera(caj) {
   }
 
   // Nota inferior
-  svg += `<text x="${W / 2}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#7a6a54">armazón ${m.fondoArmazon} · guía ${caj.guia}${fondo ? '' : ' · fondo sin definir'}</text>`;
+  svg += `<text x="${W / 2}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#7a6a54">armazón ${m.fondoArmazon}${m.huecoLibre ? ` · techo ${m.fondoTecho} (hueco)` : ''} · guía ${caj.guia}${fondo ? '' : ' · fondo sin definir'}</text>`;
   svg += '</svg>';
   return svg;
 }
@@ -8033,7 +8053,7 @@ function renderMontajeCajonerasPrint() {
   const numero = numeroPresupuestoActual ? escapeHtml(numeroPresupuestoActual) : '';
   let html = `<div class="lc-caj-montaje">`;
   html += `<h2>Montaje de cajoneras${numero ? ` · Expediente Nº ${numero}` : ''}</h2>`;
-  html += `<div class="lc-caj-intro">Croquis frontal de cada cajonera del pedido con sus medidas nominales, para guiar el montaje. Los frentes se listan de <strong>arriba a abajo</strong>; en la lista de corte los frentes van ya con la holgura descontada (−3 mm de ancho y la holgura de tirador en el alto).</div>`;
+  html += `<div class="lc-caj-intro">Croquis frontal de cada cajonera del pedido con sus medidas nominales, para guiar el montaje. Los frentes se listan de <strong>arriba a abajo</strong>; en la lista de corte los frentes van ya con la holgura descontada (−3 mm de ancho y la holgura de tirador en el alto: −4 stock, −2 cliente, −22 hueco libre; con hueco libre el techo va además 30 mm más corto de fondo).</div>`;
   html += `<div class="lc-caj-grid">`;
 
   cajoneras.forEach((caj, idx) => {
@@ -8054,8 +8074,8 @@ function renderMontajeCajonerasPrint() {
           <tr><td>Material</td><td>${mat ? `${escapeHtml(mat.nombre)} ${mat.grueso} mm` : '—'}</td></tr>
           <tr><td>Frentes ↓</td><td>${m.nCajones} ${m.nCajones === 1 ? 'cajón' : 'cajones'}: ${m.frentes.join(' · ')} mm (nominal)</td></tr>
           <tr><td>Zócalo</td><td>${m.zocalo > 0 ? `${m.zocalo} mm, retranqueado al ancho interior (${m.anchoInterior} mm)` : 'sin zócalo'}</td></tr>
-          <tr><td>Guías</td><td>${caj.guia ? `${caj.guia} mm` : '—'} · armazón ${m.fondoArmazon} mm de fondo</td></tr>
-          <tr><td>Apertura</td><td>${tiradorTxt}</td></tr>
+          <tr><td>Guías</td><td>${caj.guia ? `${caj.guia} mm` : '—'} · armazón ${m.fondoArmazon} mm de fondo${m.huecoLibre ? ` · techo ${m.fondoTecho} mm (retranqueado 30)` : ''}</td></tr>
+          <tr><td>Apertura</td><td>${tiradorTxt}${m.huecoLibre ? ' · frentes −22 mm de alto, techo −30 mm de fondo' : ''}</td></tr>
           <tr><td>Trasera</td><td>${tras ? `clavada, ${escapeHtml(tras.nombre)} ${tras.grueso} mm` : 'sin trasera clavada'}</td></tr>
         </table>
       </div>`;
