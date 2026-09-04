@@ -1605,6 +1605,73 @@
       break-before: auto !important;
       padding-top: 0 !important;
     }
+
+    /* ── Modo "Imprimir VALORADO" (desde 04-09-2026) ────────────────
+       Activado añadiendo la clase 'print-valorado' al <body>. Imprime
+       ÚNICAMENTE el bloque económico del presupuesto (cabecera con
+       número/cliente/ref./fecha, descuentos, líneas por material,
+       subtotales, canto, base imponible, IVA y TOTAL). Fuera quedan
+       las tarjetas resumen, los totales del pedido, el detalle por
+       material, el despiece visual y la lista de corte: para eso
+       están «Comprobación cliente» y «Imprimir lista de corte». */
+    body.print-valorado #resumen-content > *:not(#presupuesto-economico) {
+      display: none !important;
+    }
+    body.print-valorado #tab-resumen > .card > .card-header {
+      display: none !important;
+    }
+    body.print-valorado .presup-econ {
+      border: 1px solid #000;
+      border-radius: 0;
+      break-inside: avoid;
+    }
+
+    /* ── Modo "COMPROBACIÓN CLIENTE" (desde 04-09-2026) ─────────────
+       Activado añadiendo la clase 'print-comprobacion' al <body>.
+       Documento para que el cliente revise su pedido ANTES de cortar:
+         · Hoja 1: cabecera (logo/cliente/expediente) + Resumen del
+           proyecto (tarjetas por material y totales del pedido).
+         · Hoja 2 en adelante: lista de corte completa con cantos
+           subrayados (y la hoja de montaje de cajoneras si las hay).
+       Sin importes, sin despiece visual ni detalle por material. */
+    body.print-comprobacion #resumen-content > *:not(#comprobacion-cabecera):not(#summary-grid):not(#totales-generales):not(#lista-corte) {
+      display: none !important;
+    }
+    body.print-comprobacion #comprobacion-cabecera {
+      display: block !important;
+    }
+    body.print-comprobacion #tab-resumen > .card > .card-header {
+      display: none !important;   /* el título va dentro de la cabecera */
+    }
+    body.print-comprobacion #comprobacion-cabecera .comp-titulo {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 16px;
+      color: #000;
+      border-bottom: 2px solid #000;
+      padding-bottom: 4px;
+      margin: 0 0 10px 0;
+    }
+    body.print-comprobacion .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    body.print-comprobacion .summary-card {
+      background: white;
+      border: 1px solid #333;
+      border-radius: 0;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    body.print-comprobacion .summary-card h3,
+    body.print-comprobacion .summary-card .label,
+    body.print-comprobacion .summary-card .value {
+      color: #000;
+    }
+    body.print-comprobacion #totales-generales {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
   }
 
 
@@ -1630,6 +1697,9 @@
   .mt-1 { margin-top: 8px; } .mt-2 { margin-top: 16px; }
   .mb-1 { margin-bottom: 8px; } .mb-2 { margin-bottom: 16px; }
   .hide { display: none !important; }
+  /* Cabecera de la hoja «Comprobación cliente»: solo existe en ese modo
+     de impresión (ver body.print-comprobacion en @media print). */
+  #comprobacion-cabecera { display: none; }
 
   .empty-state {
     text-align: center;
@@ -2427,6 +2497,11 @@ details.hist-arch.hide{display:none;}
            modelo y grosor. Solo en pantalla (no-print). -->
       <div id="aviso-stock"></div>
 
+      <!-- Cabecera (logo + cliente + expediente) de la hoja «Comprobación
+           cliente». Solo visible en ese modo de impresión. La rellena
+           renderListaCorte() con la misma cabecera de la lista de corte. -->
+      <div id="comprobacion-cabecera"></div>
+
       <div class="summary-grid" id="summary-grid"></div>
 
       <div class="mt-2" id="totales-generales"></div>
@@ -2948,7 +3023,7 @@ details.hist-arch.hide{display:none;}
 // ========== 1. CONSTANTES Y ESTADO ==========
 // Versión de la app: sube con cada despliegue. Se muestra en Configuración
 // para poder comprobar en el dispositivo qué versión está ejecutándose.
-const APP_BUILD = '2026-09-04.2';
+const APP_BUILD = '2026-09-04.3';
 
 const STORAGE = {
   TABLEROS: 'ag5_corte_tableros',
@@ -7383,8 +7458,9 @@ function renderCifrasPresupuesto(grupos) {
       <button class="btn-primary" onclick="openGuardarPedidoModal()" style="background:var(--ag5-brown);" title="Guardar el proyecto como pedido en firme">📦 Guardar como pedido</button>
       <button class="btn-outline btn-imprimir" onclick="abrirExportarCuttyModal()" title="Exportar para Cutty / WinCut">📤 Exportar Cutty</button>
       <button class="btn-outline btn-imprimir" onclick="imprimirSoloListaCorte()" title="Imprimir únicamente la lista de corte (sin importes ni planos)">🖶 Imprimir lista de corte</button>
-      <button class="btn-outline btn-imprimir" onclick="imprimirPresupuesto(false)" title="Imprimir lista de corte sin importes ni totales">🖶 Imprimir sin valorar</button>
-      <button class="btn-primary btn-imprimir" onclick="imprimirPresupuesto(true)" title="Imprimir presupuesto valorado completo">🖶 Imprimir valorado</button>
+      <button class="btn-outline btn-imprimir" onclick="imprimirComprobacionCliente()" title="Imprimir para que el cliente compruebe su pedido: resumen del proyecto + lista de corte, sin importes">🖶 Comprobación cliente</button>
+      <button class="btn-outline btn-imprimir" onclick="imprimirPresupuesto(false)" title="Imprimir sin importes ni totales (resumen, detalle, despiece y lista de corte)">🖶 Imprimir sin valorar</button>
+      <button class="btn-primary btn-imprimir" onclick="imprimirPresupuesto(true)" title="Imprimir solo el presupuesto valorado (bloque económico)">🖶 Imprimir valorado</button>
     </div>
   `;
 }
@@ -7888,7 +7964,12 @@ function renderTableroSVG(tab, num, material, gap, esMedio, saneo) {
 function renderListaCorte(grupos) {
   const cont = document.getElementById('lista-corte');
   if (!cont) return;
-  if (grupos.length === 0) { cont.innerHTML = ''; return; }
+  if (grupos.length === 0) {
+    cont.innerHTML = '';
+    const cabComp0 = document.getElementById('comprobacion-cabecera');
+    if (cabComp0) cabComp0.innerHTML = '';
+    return;
+  }
 
   // Formatea una medida según los cantos: subrayado simple (1) o doble (2).
   const fmtMedida = (valor, cantos) => {
@@ -7910,7 +7991,7 @@ function renderListaCorte(grupos) {
   const cliente = clienteActual ? escapeHtml(clienteActual) : '';
   const refCli = refClienteActual ? escapeHtml(refClienteActual) : '';
 
-  let html = `
+  const encabezadoHtml = `
     <div class="lc-encabezado-print">
       <div class="lc-logo">
         ${logoSrc ? `<img src="${logoSrc}" alt="Almacén Grupo Cinco">` : ''}
@@ -7923,6 +8004,12 @@ function renderListaCorte(grupos) {
       </div>
     </div>
   `;
+  let html = encabezadoHtml;
+
+  // La misma cabecera encabeza la hoja «Comprobación cliente» (resumen
+  // del proyecto), que se imprime antes de la lista de corte.
+  const cabComp = document.getElementById('comprobacion-cabecera');
+  if (cabComp) cabComp.innerHTML = encabezadoHtml + '<h2 class="comp-titulo">Resumen del proyecto</h2>';
 
   // Cuadro resumen: tableros necesarios por material+grueso.
   // Se muestran solo los grupos con material asignado y nº de tableros
@@ -12236,15 +12323,16 @@ function imprimirPresupuesto(valorado) {
   prepararEncabezadoPieImpresion();
   // Por compatibilidad: si se llama sin parámetro, asumimos valorado.
   const conValor = (valorado === undefined) ? true : !!valorado;
-  if (!conValor) {
-    document.body.classList.add('print-sin-valorar');
-  }
+  // Valorado (desde 04-09-2026): SOLO el bloque económico del presupuesto.
+  // Sin valorar: todo el proyecto (resumen, detalle, despiece, lista de
+  // corte) sin ninguna cifra económica.
+  document.body.classList.add(conValor ? 'print-valorado' : 'print-sin-valorar');
   // Tras volver del diálogo de impresión, quitar la clase auxiliar.
   // Lo hacemos con 'afterprint' (Chrome/Firefox/Edge) y, como
   // salvavidas, un setTimeout — porque algunos navegadores no disparan
   // afterprint si la operaria cancela el diálogo de impresión.
   const restaurar = () => {
-    document.body.classList.remove('print-sin-valorar');
+    document.body.classList.remove('print-sin-valorar', 'print-valorado');
     window.removeEventListener('afterprint', restaurar);
   };
   window.addEventListener('afterprint', restaurar);
@@ -12562,6 +12650,29 @@ function imprimirSoloListaCorte() {
   document.body.classList.add('print-solo-lista');
   const restaurar = () => {
     document.body.classList.remove('print-solo-lista');
+    window.removeEventListener('afterprint', restaurar);
+  };
+  window.addEventListener('afterprint', restaurar);
+  setTimeout(restaurar, 5000);
+  window.print();
+}
+
+// ========== 11e. IMPRIMIR COMPROBACIÓN CLIENTE ==========
+
+/**
+ * Documento para que el CLIENTE compruebe su pedido antes de cortar:
+ * cabecera con logo/cliente/expediente + Resumen del proyecto (tarjetas
+ * por material y totales del pedido) en la primera hoja, y la lista de
+ * corte completa (cantos subrayados; hoja de montaje de cajoneras si las
+ * hay) a partir de la segunda. Sin importes, sin despiece visual ni
+ * detalle por material. Clase auxiliar 'print-comprobacion' en <body>.
+ */
+function imprimirComprobacionCliente() {
+  if (!validarPiezasFueraTablero('antes de imprimir')) return;
+  prepararEncabezadoPieImpresion();
+  document.body.classList.add('print-comprobacion');
+  const restaurar = () => {
+    document.body.classList.remove('print-comprobacion');
     window.removeEventListener('afterprint', restaurar);
   };
   window.addEventListener('afterprint', restaurar);
