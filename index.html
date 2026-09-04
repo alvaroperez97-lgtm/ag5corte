@@ -3023,7 +3023,7 @@ details.hist-arch.hide{display:none;}
 // ========== 1. CONSTANTES Y ESTADO ==========
 // Versión de la app: sube con cada despliegue. Se muestra en Configuración
 // para poder comprobar en el dispositivo qué versión está ejecutándose.
-const APP_BUILD = '2026-09-04.3';
+const APP_BUILD = '2026-09-04.4';
 
 const STORAGE = {
   TABLEROS: 'ag5_corte_tableros',
@@ -6383,6 +6383,13 @@ function sugerirTraseraId(materialId) {
   const candidatos = tableros
     .filter(t => t.nombre === mat.nombre && parseFloat(t.grueso) < 16 && !esMaterialDM(t))
     .sort((a, b) => parseFloat(a.grueso) - parseFloat(b.grueso));
+  // TEXTIL (Coral / Cactus): la trasera va SIEMPRE en 10 mm del mismo modelo
+  // (desde 04-09-2026; el Textil de 5 mm está retirado). Si por lo que sea
+  // no existe el 10, cae al más fino disponible.
+  if (/^\s*textil/i.test(String(mat.nombre || ''))) {
+    const diez = candidatos.find(t => parseFloat(t.grueso) === 10);
+    if (diez) return diez.id;
+  }
   return candidatos.length ? candidatos[0].id : '';
 }
 
@@ -6535,6 +6542,12 @@ function abrirFormCajonera(id) {
 
   const matPre = c ? c.materialId : (cajUltimoMaterialId || '');
   cajRellenarSelectsMateriales(matPre, c ? c.traseraId : '');
+  // Textil: la trasera es siempre 10 mm del mismo modelo, también al editar
+  // una cajonera antigua (que pudiera traer un 5 mm ya retirado).
+  if (c && /^\s*textil/i.test(String(tableros.find(t => t.id === matPre)?.nombre || ''))) {
+    const sugT = sugerirTraseraId(matPre);
+    if (sugT) document.getElementById('caj-f-trasera').value = sugT;
+  }
   if (!c) {
     // Alta nueva: sugerir trasera del material precargado
     const sug = sugerirTraseraId(document.getElementById('caj-f-material').value);
@@ -12742,12 +12755,10 @@ const TARIFA_PRECARGADA = [
   ['Roble Tiffany',    16, 2600, 2100, true,  15.24,  83.21],
   ['Roble Tiffany',    19, 2600, 2100, true,  16.77,  91.56],
   ['Roble Tiffany',    30, 2440, 1220, true,  22.86,  68.05],
-  ['Textil Cactus',     5, 2440, 1220, false, 14.97,  44.56],
   ['Textil Cactus',     8, 2850, 2100, false, 12.36,  73.97],
   ['Textil Cactus',    10, 2850, 2100, false, 13.31,  79.66],
   ['Textil Cactus',    16, 2850, 2100, false, 14.82,  88.69],
   ['Textil Cactus',    19, 2850, 2100, false, 16.17,  96.78],
-  ['Textil Coral',      5, 2440, 1220, false, 14.97,  44.56],
   ['Textil Coral',      8, 2850, 2100, false, 12.36,  73.97],
   ['Textil Coral',     10, 2850, 2100, false, 13.31,  79.66],
   ['Textil Coral',     16, 2850, 2100, false, 14.57,  87.20],
@@ -12761,6 +12772,41 @@ const TARIFA_PRECARGADA = [
   ['DM',               22, 2440, 1220, false, 21.44,  63.82],
   ['DM',               30, 2440, 1220, false, 29.80,  88.71],
 ];
+
+/**
+ * MODELOS RETIRADOS DE LA TARIFA (04-09-2026): los Textil de 5 mm (Textil
+ * Coral = claro y Textil Cactus = oscuro) desaparecen de la BBDD, tanto para
+ * corte y canteado como para traseras de cajonera (que pasan a 10 mm).
+ *
+ * Como la BBDD está compartida con el Servidor G5 y ya estaba sembrada en
+ * todos los dispositivos, no basta con quitarlos de TARIFA_PRECARGADA: hay
+ * que borrarlos con LÁPIDA (id + clave nombre|grueso) para que la fusión los
+ * mate también en el servidor y en el resto de dispositivos, y para que no
+ * se vuelvan a sembrar. La lápida lleva una fecha FIJA (la de la retirada):
+ * un tablero de esa clave creado a propósito DESPUÉS de esa fecha tiene
+ * mod > TS y sobrevive con normalidad (la operaria manda).
+ */
+const TS_RETIRADA_TEXTIL5 = Date.UTC(2026, 8, 4);   // 04-09-2026
+function esTableroRetirado(t) {
+  return /^\s*textil/i.test(String(t.nombre || '')) && parseFloat(t.grueso) === 5;
+}
+function retirarModelosDescatalogados() {
+  const retirar = tableros.filter(t => esTableroRetirado(t) && (t.mod || 0) < TS_RETIRADA_TEXTIL5);
+  if (retirar.length === 0) return;
+  const ids = new Set(retirar.map(t => t.id));
+  tableros = tableros.filter(t => !ids.has(t.id));
+  for (const t of retirar) {
+    if (!(tablerosMeta.borrados || []).some(b => b.id === t.id)) {
+      tablerosMeta.borrados.push({ id: t.id, ts: TS_RETIRADA_TEXTIL5, clave: claveTablero(t) });
+    }
+  }
+  // Piezas del borrador que usaban un Textil de 5 quedan sin material (aviso
+  // rojo en la tabla); las traseras de cajonera pasan a la sugerencia nueva
+  // (Textil → 10 mm del mismo modelo).
+  piezas.forEach(p => { if (ids.has(p.materialId)) p.materialId = ''; });
+  (cajoneras || []).forEach(c => { if (ids.has(c.traseraId)) c.traseraId = sugerirTraseraId(c.materialId); });
+  marcarCambioTableros();
+}
 
 function precargarTarifaSiVacia() {
   // Comportamiento doble:
@@ -13727,6 +13773,7 @@ function descartarBorradorPrevio() {
 loadServidorCfg();          // configuración del Servidor G5 (Tailscale)
 aplicarEscalaFuente(config.escalaFuente);   // tamaño de letra configurable (Configuración)
 precargarTarifaSiVacia();
+retirarModelosDescatalogados();   // Textil 5 mm fuera (con lápida, 04-09-2026)
 precargarCantosSiVacia();
 sincronizarTableros().catch(() => {});   // BBDD de tableros compartida (en segundo plano)
 sincronizarCantos().catch(() => {});     // stock de cantos compartido (en segundo plano)
