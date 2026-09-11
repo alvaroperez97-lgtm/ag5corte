@@ -3014,11 +3014,14 @@ details.hist-arch.hide{display:none;}
         <input type="number" id="t-precio-tablero" min="0" step="0.01" placeholder="se calcula auto" readonly style="background:#f3ede2;">
         <div class="muted">Se calcula solo: €/m² × largo × ancho. Es el precio que usa el presupuesto.</div>
       </div>
-      <div class="field">
-        <label>Coste €/m² (sin IVA, uso interno)</label>
-        <input type="number" id="t-coste-m2" min="0" step="0.01" placeholder="ej: 9.80">
-        <div class="muted">Precio de compra al fabricante por m². Solo para consulta: no entra en el presupuesto ni se imprime.</div>
-      </div>
+    </div>
+    <!-- Proveedores de compra (11-09-2026): uno o varios por tablero, cada uno
+         con referencia, tarifa €/m² y % de descuento de compra. Uso interno. -->
+    <div class="field">
+      <label>Proveedores de compra (uso interno)</label>
+      <div id="t-proveedores"></div>
+      <button class="btn-outline btn-small" type="button" style="margin-top:6px;" onclick="addProveedorTabForm()">+ Añadir proveedor</button>
+      <div class="muted">Un tablero puede comprarse a varios proveedores, cada uno con su referencia y su precio. <strong>€/m² tarifa</strong> es el precio de la lista del proveedor y <strong>Dto. compra</strong> el % que nos descuenta (0 si ya te da el precio final); el <strong>neto</strong> sale solo. El primero es el principal. No entra en el presupuesto ni se imprime; se usa al anotar pedidos a fabricante (🚚).</div>
     </div>
     <div class="row">
       <div class="field">
@@ -3098,7 +3101,7 @@ details.hist-arch.hide{display:none;}
 // ========== 1. CONSTANTES Y ESTADO ==========
 // Versión de la app: sube con cada despliegue. Se muestra en Configuración
 // para poder comprobar en el dispositivo qué versión está ejecutándose.
-const APP_BUILD = '2026-09-11.1';
+const APP_BUILD = '2026-09-11.2';
 
 const STORAGE = {
   TABLEROS: 'ag5_corte_tableros',
@@ -3201,8 +3204,14 @@ let cantos = [];
 // PEDIDOS A FABRICANTE pendientes de recibir (compartidos vía Servidor G5,
 // clave 'pedidos-fabricante'). Estructura de cada pedido:
 //   { id, fabricante, fecha ('AAAA-MM-DD' del pedido al fabricante),
-//     lineas: [{ tableroId, clave (nombre|grueso, respaldo), nombre, grueso, cantidad }],
+//     lineas: [{ tableroId, clave (nombre|grueso, respaldo), nombre, grueso, cantidad,
+//                proveedor, referencia, precioM2Compra, dtoCompra }],
 //     notas, estado ('pendiente'|'recibido'), recibidoTs, mod }
+//   Desde 11-09-2026 cada línea lleva el SNAPSHOT del proveedor elegido entre
+//   los de la ficha del tablero (nombre, referencia de catálogo, tarifa €/m² y
+//   % dto. de compra): así el pedido conserva la referencia y el precio con
+//   los que se pidió aunque la ficha cambie después. Coste estimado de la
+//   línea = cantidad × área del tablero × neto (tarifa − dto), sin IVA.
 // Son SOLO informativos mientras están pendientes: NO tocan el stock real,
 // ni el previsto, ni lo comprometido. Al pulsar ✔ Recibido, las cantidades
 // se SUMAN al stock real de cada tablero y el pedido pasa al histórico de
@@ -3248,6 +3257,82 @@ function dtoPredefinidoTablero(mat) {
   }
   const txt = (String(mat.nombre || '') + ' ' + String(mat.acabado || '')).toLowerCase();
   return txt.indexOf('blanc') !== -1 ? 25 : 35;
+}
+
+// ── PROVEEDORES DE COMPRA por tablero (11-09-2026) ─────────────────────────
+// Cada tablero puede tener UNO O VARIOS proveedores (el mismo modelo se compra
+// a Finsa y a Sonae, por ejemplo), cada uno con su referencia de catálogo y su
+// precio de compra. Estructura en la ficha del tablero:
+//   proveedores: [{ id, nombre, referencia, precioM2, dtoCompra }]
+//     · precioM2  = precio de TARIFA del proveedor, €/m² sin IVA (como viene
+//                   en su lista de precios).
+//     · dtoCompra = % de descuento que ese proveedor nos aplica sobre su
+//                   tarifa. Hay proveedores con tarifa alta + descuento y
+//                   otros que dan directamente el precio final (dto 0).
+//     · coste neto €/m² = precioM2 × (1 − dtoCompra/100), SIN redondear
+//                   (se calcula al vuelo; nunca se guarda redondeado).
+// El primer proveedor de la lista es el PRINCIPAL. Por compatibilidad con el
+// campo antiguo `costeM2` (coste único, hasta el build 2026-09-11.1) se sigue
+// guardando `costeM2` = coste neto del proveedor principal, y una ficha
+// antigua que solo tenga `costeM2` se lee como un proveedor sin nombre.
+// Todo esto es de USO INTERNO: no entra en el presupuesto ni se imprime. Se
+// enlaza con los pedidos a fabricante (🚚): al anotar un pedido se elige
+// entre los proveedores del tablero y la línea guarda referencia y precio.
+function normalizarProveedorTablero(p) {
+  if (!p || typeof p !== 'object') return null;
+  const nombre = String(p.nombre || '').trim();
+  const referencia = String(p.referencia || '').trim();
+  let precioM2 = (p.precioM2 === '' || p.precioM2 == null) ? null : parseFloat(String(p.precioM2).replace(',', '.'));
+  if (precioM2 != null && (isNaN(precioM2) || precioM2 < 0)) precioM2 = null;
+  let dtoCompra = (p.dtoCompra === '' || p.dtoCompra == null) ? 0 : parseFloat(String(p.dtoCompra).replace(',', '.'));
+  if (isNaN(dtoCompra) || dtoCompra < 0) dtoCompra = 0;
+  if (dtoCompra > 100) dtoCompra = 100;
+  if (!nombre && !referencia && precioM2 == null) return null;   // fila vacía
+  return { id: p.id || ('pv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)), nombre, referencia, precioM2, dtoCompra };
+}
+/** Lista de proveedores de un tablero (siempre array; migra el `costeM2` antiguo). */
+function proveedoresTablero(t) {
+  if (!t) return [];
+  if (Array.isArray(t.proveedores)) return t.proveedores.map(normalizarProveedorTablero).filter(Boolean);
+  if (typeof t.costeM2 === 'number' && !isNaN(t.costeM2)) {
+    return [{ id: 'pv_legacy', nombre: '', referencia: '', precioM2: t.costeM2, dtoCompra: 0 }];
+  }
+  return [];
+}
+/** Coste neto €/m² de un proveedor (tarifa − dto), sin redondear. null si no hay precio. */
+function costeNetoM2Proveedor(p) {
+  if (!p || typeof p.precioM2 !== 'number' || isNaN(p.precioM2)) return null;
+  const dto = (typeof p.dtoCompra === 'number' && !isNaN(p.dtoCompra)) ? p.dtoCompra : 0;
+  return p.precioM2 * (1 - dto / 100);
+}
+/** Proveedor de un tablero por nombre (sin distinguir mayúsculas), o null. */
+function buscarProveedorTablero(t, nombre) {
+  const n = String(nombre || '').trim().toLowerCase();
+  if (!n) return null;
+  return proveedoresTablero(t).find(p => p.nombre.toLowerCase() === n) || null;
+}
+/** Nombres de proveedor conocidos: fichas de tableros + pedidos a fabricante ya anotados. */
+function proveedoresConocidos() {
+  // Sin duplicar por mayúsculas («Finsa» y «finsa» son el mismo): manda la
+  // grafía de las fichas de tablero, después la de los pedidos.
+  const map = new Map();
+  for (const t of tableros) for (const p of proveedoresTablero(t)) if (p.nombre && !map.has(p.nombre.toLowerCase())) map.set(p.nombre.toLowerCase(), p.nombre);
+  for (const pf of pedidosFab) { const f = String(pf.fabricante || '').trim(); if (f && !map.has(f.toLowerCase())) map.set(f.toLowerCase(), f); }
+  return [...map.values()].sort((a, b) => a.localeCompare(b, 'es'));
+}
+/** Texto corto de un proveedor para listados: «Finsa · ref 12345 · 9,80 €/m² neto». */
+function etiquetaProveedor(p, areaM2) {
+  if (!p) return '';
+  const partes = [p.nombre || '(sin nombre)'];
+  if (p.referencia) partes.push('ref ' + p.referencia);
+  const neto = costeNetoM2Proveedor(p);
+  if (neto != null) {
+    let s = neto.toFixed(2) + ' €/m²';
+    if (p.dtoCompra > 0) s += ` (${p.precioM2.toFixed(2)} −${fmtStock(p.dtoCompra)}%)`;
+    if (areaM2 > 0) s += ` ≈ ${(neto * areaM2).toFixed(2)} €/tablero`;
+    partes.push(s);
+  }
+  return partes.join(' · ');
 }
 
 // Precio €/m² de laca sobre DM del presupuesto actual. TRANSITORIO (no se
@@ -5333,7 +5418,7 @@ function renderTableros() {
                 <td class="num">${t.largo} × ${t.ancho}</td>
                 <td class="center"><span class="badge ${t.conVeta?'badge-veta':'badge-liso'}">${t.conVeta?'Con veta':'Liso'}</span></td>
                 <td class="center">${cantoBadge}</td>
-                <td class="num">${t.precioTablero != null ? t.precioTablero.toFixed(2) + ' €' : '—'}${(typeof t.costeM2 === 'number' && !isNaN(t.costeM2)) ? `<div class="muted" style="font-size:10px;white-space:nowrap;" title="Precio de coste (compra al fabricante), por m²">coste ${t.costeM2.toFixed(2)} €/m²</div>` : ''}</td>
+                <td class="num">${t.precioTablero != null ? t.precioTablero.toFixed(2) + ' €' : '—'}${proveedoresTablero(t).map(p => { const neto = costeNetoM2Proveedor(p); return `<div class="muted" style="font-size:10px;white-space:nowrap;" title="${escapeHtml(etiquetaProveedor(p, t.largo * t.ancho / 1_000_000))}">${escapeHtml(p.nombre || 'coste')}${p.referencia ? ' <span style="opacity:.75">' + escapeHtml(p.referencia) + '</span>' : ''}${neto != null ? ' ' + neto.toFixed(2) + ' €/m²' : ''}</div>`; }).join('')}</td>
                 <td class="center" style="white-space:nowrap;">
                   <button class="btn-icon" onclick="cambiarStockTablero('${t.id}', -1)" title="Restar 1 tablero">−</button>
                   <strong style="display:inline-block;min-width:26px;cursor:pointer;${(t.stock||0)===0?'color:#9a8a72;':''}" onclick="fijarStockTablero('${t.id}')" title="Tocar para escribir el stock exacto">${fmtStock(t.stock)}</strong>
@@ -5370,8 +5455,9 @@ function openTableroModal(tablero) {
     : (tablero && esNombreRechapado(tablero.nombre) ? 'CHAPA' : 'PVC');
   document.getElementById('t-precio-tablero').value = tablero?.precioTablero ?? '';
   document.getElementById('t-precio-m2').value = tablero?.precioM2 ?? '';
-  const inpCoste = document.getElementById('t-coste-m2');
-  if (inpCoste) inpCoste.value = (typeof tablero?.costeM2 === 'number') ? tablero.costeM2 : '';
+  // Proveedores de compra: borrador editable (copia; se aplica al Guardar).
+  _tabProvDraft = proveedoresTablero(tablero).map(p => ({ ...p }));
+  renderProveedoresTabForm();
   const inpStock = document.getElementById('t-stock');
   if (inpStock) inpStock.value = tablero?.stock ?? 0;
   const inpDto = document.getElementById('t-dto-defecto');
@@ -5437,10 +5523,11 @@ function saveTablero() {
       if (areaM2 > 0) precioM2 = +(precioTablero / areaM2).toFixed(2);
     }
   }
-  // Coste €/m² (compra al fabricante): informativo, null si está vacío.
-  const costeRaw = (document.getElementById('t-coste-m2')?.value ?? '').toString().trim().replace(',', '.');
-  let costeM2 = costeRaw === '' ? null : parseFloat(costeRaw);
-  if (costeM2 != null && (isNaN(costeM2) || costeM2 < 0)) costeM2 = null;
+  // Proveedores de compra (11-09-2026): se guardan las filas no vacías del
+  // borrador. `costeM2` se mantiene = coste neto del proveedor principal por
+  // compatibilidad con fichas/builds antiguos (null si no hay precio).
+  const proveedores = (_tabProvDraft || []).map(normalizarProveedorTablero).filter(Boolean);
+  const costeM2 = proveedores.length ? costeNetoM2Proveedor(proveedores[0]) : null;
 
   const stockRaw = (document.getElementById('t-stock')?.value ?? '').toString().trim().replace(',', '.');
   let stock = stockRaw === '' ? 0 : parseFloat(stockRaw);
@@ -5456,11 +5543,11 @@ function saveTablero() {
 
   if (editTableroId) {
     const t = tableros.find(x => x.id === editTableroId);
-    Object.assign(t, { nombre, acabado, grueso, largo, ancho, conVeta, tipoCanto, precioTablero, precioM2, costeM2, stock, dtoDefecto, mod: Date.now() });
+    Object.assign(t, { nombre, acabado, grueso, largo, ancho, conVeta, tipoCanto, precioTablero, precioM2, costeM2, proveedores, stock, dtoDefecto, mod: Date.now() });
   } else {
     tableros.push({
       id: 't_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
-      nombre, acabado, grueso, largo, ancho, conVeta, tipoCanto, precioTablero, precioM2, costeM2,
+      nombre, acabado, grueso, largo, ancho, conVeta, tipoCanto, precioTablero, precioM2, costeM2, proveedores,
       stock, dtoDefecto, mod: Date.now()
     });
   }
@@ -5489,6 +5576,69 @@ function recalcularPrecioTableroForm() {
 }
 document.addEventListener('input', e => {
   if (['t-precio-m2', 't-largo', 't-ancho'].includes(e.target.id)) recalcularPrecioTableroForm();
+});
+
+// ── Borrador de proveedores de la ficha del tablero (11-09-2026) ───────────
+let _tabProvDraft = [];
+function renderProveedoresTabForm() {
+  const cont = document.getElementById('t-proveedores');
+  if (!cont) return;
+  const l = parseFloat(document.getElementById('t-largo')?.value);
+  const a = parseFloat(document.getElementById('t-ancho')?.value);
+  const areaM2 = (l > 0 && a > 0) ? l * a / 1_000_000 : 0;
+  const sug = proveedoresConocidos();
+  if (_tabProvDraft.length === 0) {
+    cont.innerHTML = `<div class="muted" style="padding:4px 0;">Sin proveedor anotado.</div>`;
+    return;
+  }
+  cont.innerHTML = `<datalist id="t-prov-sug">${sug.map(n => `<option value="${escapeHtml(n)}"></option>`).join('')}</datalist>` +
+    _tabProvDraft.map((p, i) => {
+      const neto = costeNetoM2Proveedor(p);
+      const netoTxt = neto != null ? `${neto.toFixed(2)} €/m²${areaM2 > 0 ? ` · ≈ ${(neto * areaM2).toFixed(2)} €/tablero` : ''}` : '—';
+      return `
+      <div style="border:1px solid var(--line-dk,#d9c9a8);border-radius:4px;padding:8px;margin-bottom:6px;background:var(--cream,#FAF6EE);">
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+          <span class="badge" style="background:${i === 0 ? 'var(--ag5-orange,#FF9600)' : '#e5ddd0'};color:${i === 0 ? '#fff' : '#6b5d49'};white-space:nowrap;" title="${i === 0 ? 'Proveedor principal' : 'Proveedor alternativo'}">${i === 0 ? 'Principal' : 'Alt. ' + i}</span>
+          <input type="text" list="t-prov-sug" style="flex:1;min-width:0;" placeholder="Proveedor (ej: Finsa)" value="${escapeHtml(p.nombre || '')}" oninput="updProveedorTabForm(${i}, 'nombre', this.value)">
+          <input type="text" style="flex:1;min-width:0;" placeholder="Referencia del proveedor" value="${escapeHtml(p.referencia || '')}" oninput="updProveedorTabForm(${i}, 'referencia', this.value)">
+          <button class="btn-icon delete" type="button" onclick="quitarProveedorTabForm(${i})" title="Quitar proveedor">✕</button>
+        </div>
+        <div style="display:flex;gap:6px 10px;align-items:center;flex-wrap:wrap;">
+          <span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap;"><span class="muted">€/m² tarifa</span>
+          <input type="number" min="0" step="0.01" inputmode="decimal" style="width:92px;" placeholder="ej: 13.31" value="${p.precioM2 == null ? '' : p.precioM2}" oninput="updProveedorTabForm(${i}, 'precioM2', this.value)" onchange="renderProveedoresTabForm()"></span>
+          <span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap;"><span class="muted">Dto. compra %</span>
+          <input type="number" min="0" max="100" step="0.5" inputmode="decimal" style="width:72px;" placeholder="0" value="${p.dtoCompra == null || p.dtoCompra === 0 ? '' : p.dtoCompra}" oninput="updProveedorTabForm(${i}, 'dtoCompra', this.value)" onchange="renderProveedoresTabForm()"></span>
+          <span class="muted" style="white-space:nowrap;" title="Coste neto = tarifa − descuento (sin IVA)">neto <strong>${netoTxt}</strong></span>
+        </div>
+      </div>`;
+    }).join('');
+}
+function addProveedorTabForm() {
+  _tabProvDraft.push({ id: 'pv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), nombre: '', referencia: '', precioM2: null, dtoCompra: 0 });
+  renderProveedoresTabForm();
+  const inputs = document.querySelectorAll('#t-proveedores input[type="text"]');
+  if (inputs.length) inputs[inputs.length - 2].focus();
+}
+function updProveedorTabForm(i, campo, v) {
+  const p = _tabProvDraft[i];
+  if (!p) return;
+  if (campo === 'precioM2') {
+    const n = parseFloat(String(v).replace(',', '.'));
+    p.precioM2 = (String(v).trim() === '' || isNaN(n) || n < 0) ? null : n;
+  } else if (campo === 'dtoCompra') {
+    const n = parseFloat(String(v).replace(',', '.'));
+    p.dtoCompra = (String(v).trim() === '' || isNaN(n) || n < 0) ? 0 : Math.min(100, n);
+  } else {
+    p[campo] = v;
+  }
+}
+function quitarProveedorTabForm(i) {
+  _tabProvDraft.splice(i, 1);
+  renderProveedoresTabForm();
+}
+// Si cambian las medidas del tablero, el «≈ €/tablero» del neto se repinta.
+document.addEventListener('change', e => {
+  if (['t-largo', 't-ancho'].includes(e.target.id) && document.getElementById('t-proveedores')) renderProveedoresTabForm();
 });
 
 // ========== 7. EXCEL ==========
@@ -10161,9 +10311,25 @@ function renderPedidosFab() {
       : `<span class="badge" style="background:#e5ddd0;color:#6b5d49;">ninguno</span>`;
   }
 
-  const filaLineas = (pf) => (pf.lineas || []).map(ln =>
-    `<div style="white-space:nowrap;">${fmtStock(Math.max(0, parseFloat(ln.cantidad) || 0))} × ${escapeHtml(etiquetaLineaPedFab(ln))}</div>`
-  ).join('');
+  // Coste estimado de una línea guardada, a partir de su snapshot de
+  // proveedor (tarifa − dto) y del área del tablero. null si no hay precio.
+  const costeLineaGuardada = (ln) => {
+    if (typeof ln.precioM2Compra !== 'number' || isNaN(ln.precioM2Compra)) return null;
+    const t = tableros.find(x => x.id === ln.tableroId) || (ln.clave ? tableros.find(x => claveTablero(x) === ln.clave) : null);
+    if (!t) return null;
+    const q = Math.max(0, parseFloat(ln.cantidad) || 0);
+    return q * (t.largo * t.ancho / 1_000_000) * costeNetoM2Proveedor({ precioM2: ln.precioM2Compra, dtoCompra: ln.dtoCompra || 0 });
+  };
+  const filaLineas = (pf) => (pf.lineas || []).map(ln => {
+    const coste = costeLineaGuardada(ln);
+    const ref = ln.referencia ? ` <span class="muted" style="font-size:11px;">ref ${escapeHtml(ln.referencia)}</span>` : '';
+    return `<div style="white-space:nowrap;">${fmtStock(Math.max(0, parseFloat(ln.cantidad) || 0))} × ${escapeHtml(etiquetaLineaPedFab(ln))}${ref}${coste != null ? ` <span class="muted" style="font-size:11px;" title="Coste estimado: ${ln.precioM2Compra.toFixed(2)} €/m²${ln.dtoCompra > 0 ? ' −' + fmtStock(ln.dtoCompra) + '%' : ''}, sin IVA">≈ ${coste.toFixed(2)} €</span>` : ''}</div>`;
+  }).join('') + (() => {
+    const costes = (pf.lineas || []).map(costeLineaGuardada).filter(c => c != null);
+    if (costes.length < 2) return '';
+    const total = costes.reduce((s, c) => s + c, 0);
+    return `<div class="muted" style="white-space:nowrap;font-size:11px;">total ≈ <strong>${total.toFixed(2)} €</strong>${costes.length < (pf.lineas || []).length ? ' (líneas con precio)' : ''}</div>`;
+  })();
 
   if (pend.length === 0) {
     cont.innerHTML = `<div class="muted" style="padding:6px 2px;">No hay pedidos a fabricante pendientes de recibir.</div>`;
@@ -10225,12 +10391,12 @@ function openPedidoFabModal(id) {
   const hoyStr = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0') + '-' + String(hoy.getDate()).padStart(2, '0');
   _pedFabDraft = pf
     ? { id: pf.id, fabricante: pf.fabricante || '', fecha: pf.fecha || hoyStr, notas: pf.notas || '',
-        lineas: (pf.lineas || []).map(l => ({ tableroId: l.tableroId, cantidad: l.cantidad })) }
-    : { id: null, fabricante: '', fecha: hoyStr, notas: '', lineas: [{ tableroId: tableros[0].id, cantidad: 1 }] };
-  if (_pedFabDraft.lineas.length === 0) _pedFabDraft.lineas.push({ tableroId: tableros[0].id, cantidad: 1 });
+        lineas: (pf.lineas || []).map(l => ({ tableroId: l.tableroId, cantidad: l.cantidad, proveedorId: proveedorIdDeLineaPedFab(l) })) }
+    : { id: null, fabricante: '', fecha: hoyStr, notas: '', lineas: [] };
+  if (_pedFabDraft.lineas.length === 0) _pedFabDraft.lineas.push(nuevaLineaPedFab(tableros[0].id));
 
-  // Sugerencias de fabricante: los ya usados en otros pedidos.
-  const fabricantes = [...new Set(pedidosFab.map(x => (x.fabricante || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  // Sugerencias de fabricante: proveedores de las fichas + los ya usados en otros pedidos.
+  const fabricantes = proveedoresConocidos();
 
   const wrap = document.createElement('div');
   wrap.id = 'pedidofab-modal';
@@ -10242,7 +10408,7 @@ function openPedidoFabModal(id) {
         <div class="field">
           <label>Fabricante / proveedor</label>
           <input type="text" id="pf-fabricante" list="pf-fabricantes-sug" placeholder="ej: Finsa, Sonae, Losán…"
-                 value="${escapeHtml(_pedFabDraft.fabricante)}" oninput="_pedFabDraft.fabricante = this.value">
+                 value="${escapeHtml(_pedFabDraft.fabricante)}" oninput="_pedFabDraft.fabricante = this.value" onchange="fabricantePedFabCambiado()">
           <datalist id="pf-fabricantes-sug">${fabricantes.map(f => `<option value="${escapeHtml(f)}"></option>`).join('')}</datalist>
         </div>
         <div class="field">
@@ -10276,36 +10442,148 @@ function cerrarPedidoFabModal() {
   _pedFabDraft = null;
 }
 
+/** Id del proveedor (de la ficha del tablero) que corresponde a una línea
+ *  guardada: por nombre, y si no por referencia. '' si no hay ficha. */
+function proveedorIdDeLineaPedFab(ln) {
+  const t = tableros.find(x => x.id === ln.tableroId);
+  if (!t) return '';
+  const provs = proveedoresTablero(t);
+  const n = String(ln.proveedor || '').trim().toLowerCase();
+  const r = String(ln.referencia || '').trim().toLowerCase();
+  const p = (n && provs.find(x => x.nombre.toLowerCase() === n))
+    || (r && provs.find(x => x.referencia.toLowerCase() === r))
+    || null;
+  return p ? p.id : '';
+}
+/** Proveedor que toca preseleccionar para un tablero en un pedido nuevo:
+ *  el que coincide con el fabricante del pedido; si el fabricante está en
+ *  blanco, el principal de la ficha; si no coincide ninguno, ninguno. */
+function proveedorSugeridoPedFab(tableroId) {
+  const t = tableros.find(x => x.id === tableroId);
+  if (!t || !_pedFabDraft) return '';
+  const provs = proveedoresTablero(t);
+  if (provs.length === 0) return '';
+  const fab = String(_pedFabDraft.fabricante || '').trim();
+  if (fab) { const p = buscarProveedorTablero(t, fab); return p ? p.id : ''; }
+  return provs[0].id;
+}
+/** El fabricante del pedido ha cambiado: cada línea cuyo tablero tenga en su
+ *  ficha un proveedor con ese nombre pasa a ese proveedor (referencia y
+ *  precio del fabricante real); si no lo tiene, se deja como estaba. */
+function fabricantePedFabCambiado() {
+  if (!_pedFabDraft) return;
+  const fab = String(_pedFabDraft.fabricante || '').trim();
+  if (fab) {
+    for (const ln of _pedFabDraft.lineas) {
+      const t = tableros.find(x => x.id === ln.tableroId);
+      const p = t ? buscarProveedorTablero(t, fab) : null;
+      if (p) ln.proveedorId = p.id;
+    }
+  }
+  renderLineasPedFab();
+}
+function nuevaLineaPedFab(tableroId) {
+  const ln = { tableroId, cantidad: 1, proveedorId: '' };
+  ln.proveedorId = proveedorSugeridoPedFab(tableroId);
+  return ln;
+}
+/** Coste estimado (sin IVA) de una línea del borrador; null si no hay precio. */
+function costeLineaPedFab(ln) {
+  const t = tableros.find(x => x.id === ln.tableroId);
+  if (!t) return null;
+  const p = proveedoresTablero(t).find(x => x.id === ln.proveedorId);
+  const neto = costeNetoM2Proveedor(p);
+  if (neto == null) return null;
+  const q = Math.max(0, parseFloat(ln.cantidad) || 0);
+  return q * (t.largo * t.ancho / 1_000_000) * neto;
+}
+
 function renderLineasPedFab() {
   const cont = document.getElementById('pf-lineas');
   if (!cont || !_pedFabDraft) return;
   const opciones = (sel) => tableros.map(t =>
     `<option value="${t.id}"${t.id === sel ? ' selected' : ''}>${escapeHtml(t.nombre)} ${t.grueso} mm</option>`
   ).join('');
-  cont.innerHTML = _pedFabDraft.lineas.map((ln, i) => `
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-      <select style="flex:1;min-width:0;" onchange="updLineaPedFab(${i}, 'tableroId', this.value)">${opciones(ln.tableroId)}</select>
-      <input type="number" min="0.5" step="0.5" inputmode="decimal" style="width:84px;" value="${ln.cantidad}"
-             title="Cantidad de tableros (admite medios, ej. 2,5)"
-             onchange="updLineaPedFab(${i}, 'cantidad', this.value)">
-      <button class="btn-icon delete" onclick="quitarLineaPedFab(${i})" title="Quitar línea">✕</button>
-    </div>`).join('');
+  const fab = String(_pedFabDraft.fabricante || '').trim().toLowerCase();
+  let total = 0, conPrecio = 0;
+  cont.innerHTML = _pedFabDraft.lineas.map((ln, i) => {
+    const t = tableros.find(x => x.id === ln.tableroId);
+    const provs = t ? proveedoresTablero(t) : [];
+    const p = provs.find(x => x.id === ln.proveedorId) || null;
+    const coste = costeLineaPedFab(ln);
+    if (coste != null) { total += coste; conPrecio++; }
+    // Selector de proveedor: los de la ficha del tablero (con referencia y
+    // neto) más «sin ficha». Si el tablero no tiene proveedores, se avisa
+    // para que se completen en su ficha.
+    let selProv;
+    if (provs.length === 0) {
+      selProv = `<span class="muted" style="flex:1;min-width:0;" title="Añade los proveedores en la ficha del tablero (✎ en la tabla de tableros)">⚠ sin proveedores en la ficha del tablero</span>`;
+    } else {
+      selProv = `<select style="flex:1;min-width:0;" onchange="updLineaPedFab(${i}, 'proveedorId', this.value)" title="Proveedor al que se pide este tablero (de su ficha)">
+        <option value=""${!ln.proveedorId ? ' selected' : ''}>— sin proveedor —</option>
+        ${provs.map(x => `<option value="${x.id}"${x.id === ln.proveedorId ? ' selected' : ''}>${escapeHtml(x.nombre || '(sin nombre)')}${x.referencia ? ' · ref ' + escapeHtml(x.referencia) : ''}${costeNetoM2Proveedor(x) != null ? ' · ' + costeNetoM2Proveedor(x).toFixed(2) + ' €/m²' : ''}</option>`).join('')}
+      </select>`;
+    }
+    const distinto = p && fab && p.nombre.toLowerCase() !== fab
+      ? `<span class="badge" style="background:#fff3cd;color:#8a6d3b;" title="El proveedor de esta línea no coincide con el fabricante del pedido">≠ fabricante</span>` : '';
+    return `
+    <div style="border-bottom:1px solid #eee3d2;padding:6px 0;margin-bottom:4px;">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+        <select style="flex:1;min-width:0;" onchange="updLineaPedFab(${i}, 'tableroId', this.value)">${opciones(ln.tableroId)}</select>
+        <input type="number" min="0.5" step="0.5" inputmode="decimal" style="width:84px;" value="${ln.cantidad}"
+               title="Cantidad de tableros (admite medios, ej. 2,5)"
+               onchange="updLineaPedFab(${i}, 'cantidad', this.value)">
+        <button class="btn-icon delete" onclick="quitarLineaPedFab(${i})" title="Quitar línea">✕</button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        ${selProv}
+        ${distinto}
+        <span class="muted" style="white-space:nowrap;" title="Coste estimado de la línea: cantidad × área × neto (sin IVA)">${coste != null ? '≈ <strong>' + coste.toFixed(2) + ' €</strong>' : ''}</span>
+      </div>
+    </div>`;
+  }).join('') + (conPrecio > 0
+    ? `<div class="muted" style="text-align:right;padding:4px 0;">Total estimado de compra (sin IVA)${conPrecio < _pedFabDraft.lineas.length ? ', solo líneas con precio' : ''}: <strong>${total.toFixed(2)} €</strong></div>`
+    : '');
 }
 
 function addLineaPedFab() {
   if (!_pedFabDraft) return;
-  _pedFabDraft.lineas.push({ tableroId: tableros[0] ? tableros[0].id : '', cantidad: 1 });
+  _pedFabDraft.lineas.push(nuevaLineaPedFab(tableros[0] ? tableros[0].id : ''));
   renderLineasPedFab();
 }
 function updLineaPedFab(i, campo, v) {
   if (!_pedFabDraft || !_pedFabDraft.lineas[i]) return;
+  const ln = _pedFabDraft.lineas[i];
   if (campo === 'cantidad') {
     const n = parseFloat(String(v).replace(',', '.'));
-    _pedFabDraft.lineas[i].cantidad = (isNaN(n) || n <= 0) ? 1 : +n.toFixed(1);
-    renderLineasPedFab();
+    ln.cantidad = (isNaN(n) || n <= 0) ? 1 : +n.toFixed(1);
+  } else if (campo === 'tableroId') {
+    ln.tableroId = v;
+    ln.proveedorId = proveedorSugeridoPedFab(v);   // proveedor acorde al fabricante del pedido
+    // Fabricante en blanco + proveedor propuesto por la ficha → se rellena
+    // el fabricante del pedido (se puede cambiar a mano después).
+    const tSel = tableros.find(x => x.id === v);
+    const pSel = tSel ? proveedoresTablero(tSel).find(x => x.id === ln.proveedorId) : null;
+    if (pSel && pSel.nombre && !String(_pedFabDraft.fabricante || '').trim()) {
+      _pedFabDraft.fabricante = pSel.nombre;
+      const inp = document.getElementById('pf-fabricante');
+      if (inp) inp.value = pSel.nombre;
+    }
+  } else if (campo === 'proveedorId') {
+    ln.proveedorId = v;
+    // Elegir un proveedor en una línea rellena el fabricante del pedido si
+    // aún está en blanco (lo normal: se elige el tablero y después a quién).
+    const t = tableros.find(x => x.id === ln.tableroId);
+    const p = t ? proveedoresTablero(t).find(x => x.id === v) : null;
+    if (p && p.nombre && !String(_pedFabDraft.fabricante || '').trim()) {
+      _pedFabDraft.fabricante = p.nombre;
+      const inp = document.getElementById('pf-fabricante');
+      if (inp) inp.value = p.nombre;
+    }
   } else {
-    _pedFabDraft.lineas[i][campo] = v;
+    ln[campo] = v;
   }
+  renderLineasPedFab();
 }
 function quitarLineaPedFab(i) {
   if (!_pedFabDraft) return;
@@ -10318,15 +10596,28 @@ function guardarPedidoFab() {
   const fabricante = (_pedFabDraft.fabricante || '').trim();
   if (!fabricante) { toast('Pon el fabricante al que se ha hecho el pedido', 'err'); return; }
   const lineas = [];
+  const distintos = [];   // líneas cuyo proveedor no es el fabricante del pedido
   for (const ln of _pedFabDraft.lineas) {
     const t = tableros.find(x => x.id === ln.tableroId);
     const q = Math.max(0, parseFloat(ln.cantidad) || 0);
     if (!t || !(q > 0)) continue;
     // Snapshot de nombre/grueso/clave: si el tablero se borrase de la BBDD
     // antes de recibir, el pedido sigue siendo legible y localizable.
-    lineas.push({ tableroId: t.id, clave: claveTablero(t), nombre: t.nombre, grueso: t.grueso, cantidad: q });
+    const linea = { tableroId: t.id, clave: claveTablero(t), nombre: t.nombre, grueso: t.grueso, cantidad: q };
+    // Snapshot del proveedor elegido (referencia y precio con los que se
+    // pidió); si la ficha cambia después, el pedido no se altera.
+    const p = proveedoresTablero(t).find(x => x.id === ln.proveedorId) || null;
+    if (p) {
+      linea.proveedor = p.nombre;
+      linea.referencia = p.referencia;
+      linea.precioM2Compra = p.precioM2;
+      linea.dtoCompra = p.dtoCompra;
+      if (p.nombre && p.nombre.toLowerCase() !== fabricante.toLowerCase()) distintos.push(`  ${t.nombre} ${t.grueso} mm → ${p.nombre}`);
+    }
+    lineas.push(linea);
   }
   if (lineas.length === 0) { toast('Añade al menos un tablero con cantidad', 'err'); return; }
+  if (distintos.length && !confirm(`El pedido es a «${fabricante}», pero estas líneas llevan otro proveedor:\n${distintos.join('\n')}\n\n¿Guardar igualmente?`)) return;
 
   if (_pedFabDraft.id) {
     const pf = pedidosFab.find(x => x.id === _pedFabDraft.id);
