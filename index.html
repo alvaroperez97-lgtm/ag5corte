@@ -383,6 +383,31 @@
   /* VENTA DE TABLERO ENTERO: la pieza coincide con la medida física del
      tablero → se vende la plancha completa, sin corte ni canteado. Verde
      suave para que la operaria vea que la app lo ha entendido así. */
+  /* Pieza a TODO EL LARGO del tablero sin saneo (11-09-2026): fila ámbar con
+     franja lateral; la medida que va a todo el largo se resalta. */
+  #tabla-piezas tbody tr.pieza-todo-largo td {
+    background: #fff1cc;
+  }
+  #tabla-piezas tbody tr.pieza-todo-largo {
+    box-shadow: inset 4px 0 0 #b36b00;
+  }
+  #tabla-piezas tbody tr.pieza-todo-largo td.td-todolargo input {
+    border: 2px solid #b36b00;
+    background: #fff;
+    color: #7a4a00;
+    font-weight: 700;
+  }
+  .banda-aviso-todolargo {
+    background: #fff1cc;
+    border: 3px solid #b36b00;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    color: #5a3400;
+  }
+  .banda-aviso-todolargo .btl-titulo { font-size: 20px; font-weight: 800; letter-spacing: 0.02em; line-height: 1.2; }
+  .banda-aviso-todolargo .btl-texto { font-size: 14px; margin-top: 6px; }
+  .banda-aviso-todolargo .btl-detalle { font-size: 12px; margin-top: 6px; opacity: 0.85; }
   #tabla-piezas tbody tr.pieza-entera td {
     background: #edf5ec;
   }
@@ -907,6 +932,8 @@
   }
   .despiece-piece:hover { fill-opacity: 0.55; }
   .despiece-piece-rotada { fill: var(--ag5-gold); fill-opacity: 0.30; stroke: var(--ag5-brown); }
+  /* Pieza a TODO EL LARGO sin saneo: borde ámbar discontinuo (corte manual). */
+  .despiece-piece-todolargo { stroke: #b36b00 !important; stroke-width: 6px; stroke-dasharray: 40 20; fill: #ffd27a; fill-opacity: 0.55; }
   .despiece-piece-label {
     font-family: 'Lato', sans-serif;
     font-size: 9px;
@@ -1241,6 +1268,30 @@
     }
   }
 
+/* ---- Cajoneras ---- */
+.caj-form-grid { display:grid; grid-template-columns:1fr 1fr 260px; gap:16px; }
+@media (max-width: 900px){ .caj-form-grid { grid-template-columns:1fr; } }
+.caj-lbl { display:block; font-size:12px; color:var(--ag5-brown, #5c3d1e); margin-bottom:8px; font-weight:600; }
+.caj-lbl input[type=number], .caj-lbl input[type=text], .caj-lbl select { width:100%; margin-top:3px; }
+.caj-frente-row { display:flex; align-items:center; gap:8px; margin-top:4px; font-weight:400; }
+.caj-frente-row input { width:90px; }
+.caj-frente-num { min-width:74px; font-size:11px; color:#7a6a54; }
+.caj-croquis-wrap { background:#faf5ea; border:1px solid #e0d3ba; border-radius:8px; padding:8px; text-align:center; }
+.caj-precio { margin-top:8px; }
+.caj-precio-num { font-size:22px; font-weight:700; color:var(--ag5-brown, #5c3d1e); }
+.caj-precio-num span { font-size:12px; font-weight:400; color:#7a6a54; }
+.caj-precio-det { font-size:11px; color:#7a6a54; margin-top:2px; }
+.caj-card { display:flex; justify-content:space-between; align-items:center; gap:10px; border:1px solid #e0d3ba; border-radius:8px; padding:10px 12px; margin-bottom:8px; background:#fffdf8; flex-wrap:wrap; }
+.caj-card-err { border-color:var(--err, #b3261e); }
+.caj-card-titulo { font-weight:700; color:var(--ag5-brown, #5c3d1e); }
+.caj-card-datos { font-size:12px; color:#7a6a54; margin-top:2px; }
+.caj-card-precio { font-size:13px; margin-top:4px; }
+.caj-card-btns { display:flex; gap:6px; flex-wrap:wrap; }
+.caj-desp-tabla { width:100%; border-collapse:collapse; font-size:12px; }
+.caj-desp-tabla th, .caj-desp-tabla td { border:1px solid #e0d3ba; padding:4px 6px; text-align:center; }
+.caj-desp-tabla th { background:#f3e9d6; }
+.badge-caj { background:#8a5a2b; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; margin-left:6px; vertical-align:middle; }
+
   /* ================================================================
      OPTIMIZACIONES DE IMPRESIÓN (versión ligera para que la impresora
      tarde menos cargando: sin sombras, sin degradados, fuentes simples,
@@ -1280,29 +1331,28 @@
     /* Bloque económico íntegro (sin saltos) */
     .presup-econ { break-inside: avoid; box-shadow: none; }
 
-/* ---- Cajoneras ---- */
-.caj-form-grid { display:grid; grid-template-columns:1fr 1fr 260px; gap:16px; }
-@media (max-width: 900px){ .caj-form-grid { grid-template-columns:1fr; } }
-.caj-lbl { display:block; font-size:12px; color:var(--ag5-brown, #5c3d1e); margin-bottom:8px; font-weight:600; }
-.caj-lbl input[type=number], .caj-lbl input[type=text], .caj-lbl select { width:100%; margin-top:3px; }
-.caj-frente-row { display:flex; align-items:center; gap:8px; margin-top:4px; font-weight:400; }
-.caj-frente-row input { width:90px; }
-.caj-frente-num { min-width:74px; font-size:11px; color:#7a6a54; }
-.caj-croquis-wrap { background:#faf5ea; border:1px solid #e0d3ba; border-radius:8px; padding:8px; text-align:center; }
-.caj-precio { margin-top:8px; }
-.caj-precio-num { font-size:22px; font-weight:700; color:var(--ag5-brown, #5c3d1e); }
-.caj-precio-num span { font-size:12px; font-weight:400; color:#7a6a54; }
-.caj-precio-det { font-size:11px; color:#7a6a54; margin-top:2px; }
-.caj-card { display:flex; justify-content:space-between; align-items:center; gap:10px; border:1px solid #e0d3ba; border-radius:8px; padding:10px 12px; margin-bottom:8px; background:#fffdf8; flex-wrap:wrap; }
-.caj-card-err { border-color:var(--err, #b3261e); }
-.caj-card-titulo { font-weight:700; color:var(--ag5-brown, #5c3d1e); }
-.caj-card-datos { font-size:12px; color:#7a6a54; margin-top:2px; }
-.caj-card-precio { font-size:13px; margin-top:4px; }
-.caj-card-btns { display:flex; gap:6px; flex-wrap:wrap; }
-.caj-desp-tabla { width:100%; border-collapse:collapse; font-size:12px; }
-.caj-desp-tabla th, .caj-desp-tabla td { border:1px solid #e0d3ba; padding:4px 6px; text-align:center; }
-.caj-desp-tabla th { background:#f3e9d6; }
-.badge-caj { background:#8a5a2b; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; margin-left:6px; vertical-align:middle; }
+/* ── Firefox (11-09-2026): los encabezados de tabla salían en NEGRO al
+       imprimir (Firefox sí imprime el fondo marrón oscuro de los <th> con
+       texto dorado, que en papel es una barra negra). En impresión las
+       cabeceras van en gris claro con texto negro, y nada de lo que se
+       imprime lleva degradado ni semitransparencia (Firefox los aplana
+       mal en algunos controladores de impresora). ────────────────── */
+    th {
+      background: #e8e8e8 !important;
+      color: #000 !important;
+      border-bottom: 1px solid #000 !important;
+    }
+    .summary-card, .card, .presup-econ, .totales-block, .lc-seccion, .alert,
+    .presup-cabecera-print, .comp-cabecera, #comprobacion-cabecera {
+      background-image: none !important;
+    }
+    .summary-card { background: #fff !important; }
+    .summary-card h3, .summary-card .label, .summary-card .value { color: #000 !important; }
+    /* El membrete (header) lleva degradado marrón en pantalla: en impresión,
+       color plano (Firefox llega a pintar los degradados como un bloque negro). */
+    header, header.app-header { background-color: #5A1E00 !important; background-image: none !important; }
+    #tab-resumen *, .lista-corte-page * { opacity: 1 !important; }
+    #tab-resumen tr:nth-child(even) td, #tab-resumen tr:hover td { background: transparent !important; }
 
     /* Solo se imprime la pestaña presupuesto */
     .tab-panel:not(#tab-resumen) { display: none !important; }
@@ -1432,6 +1482,22 @@
       page-break-inside: avoid;
       break-inside: avoid;
     }
+    /* Aviso de piezas a TODO EL LARGO sin saneo (11-09-2026): recuadro grueso
+       negro, mayúsculas, para que no pase desapercibido en la máquina. */
+    .lista-corte-page .lc-aviso-todolargo {
+      border: 3px solid #000;
+      padding: 6px 10px;
+      margin: 0 0 8px -10px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #000;
+      background: #fff;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      page-break-after: avoid;
+    }
+    .lista-corte-page .lc-nota-todolargo { font-weight: 800; color: #000; }
+    .lista-corte-page tr.lc-fila-todolargo td { font-weight: 700; }
     .lista-corte-page .lc-seccion h3 {
       page-break-after: avoid;
       font-family: Arial, Helvetica, sans-serif;
@@ -2208,6 +2274,10 @@ details.hist-arch.hide{display:none;}
       <div class="muted" style="font-size:11px;flex-basis:100%;">Útil tras cargar piezas desde foto o Excel: cambia el material conservando el grueso de cada pieza.</div>
     </div>
 
+    <!-- 11-09-2026: aviso grande de piezas a TODO EL LARGO del tablero sin
+         saneo (corte manual en la seccionadora). Lo rellena renderPiezas(). -->
+    <div id="banda-aviso-todo-largo" class="banda-aviso-todolargo hide"></div>
+
     <div class="table-wrap">
       <table id="tabla-piezas">
         <thead>
@@ -2935,14 +3005,19 @@ details.hist-arch.hide{display:none;}
     </div>
     <div class="row">
       <div class="field">
-        <label>Precio €/tablero (sin IVA)</label>
-        <input type="number" id="t-precio-tablero" min="0" step="0.01" placeholder="ej: 85.61">
-        <div class="muted">Precio de tarifa, antes de descuento e IVA.</div>
+        <label>Precio €/m² (sin IVA)</label>
+        <input type="number" id="t-precio-m2" min="0" step="0.01" placeholder="ej: 14.77">
+        <div class="muted">Precio de tarifa por m², antes de descuento e IVA. Es el dato que se escribe: el €/tablero sale solo.</div>
       </div>
       <div class="field">
-        <label>Precio €/m² (informativo)</label>
-        <input type="number" id="t-precio-m2" min="0" step="0.01" placeholder="se calcula auto">
-        <div class="muted">Solo informativo. El cálculo va por €/tablero.</div>
+        <label>Precio €/tablero (sin IVA)</label>
+        <input type="number" id="t-precio-tablero" min="0" step="0.01" placeholder="se calcula auto" readonly style="background:#f3ede2;">
+        <div class="muted">Se calcula solo: €/m² × largo × ancho. Es el precio que usa el presupuesto.</div>
+      </div>
+      <div class="field">
+        <label>Coste €/m² (sin IVA, uso interno)</label>
+        <input type="number" id="t-coste-m2" min="0" step="0.01" placeholder="ej: 9.80">
+        <div class="muted">Precio de compra al fabricante por m². Solo para consulta: no entra en el presupuesto ni se imprime.</div>
       </div>
     </div>
     <div class="row">
@@ -3023,7 +3098,7 @@ details.hist-arch.hide{display:none;}
 // ========== 1. CONSTANTES Y ESTADO ==========
 // Versión de la app: sube con cada despliegue. Se muestra en Configuración
 // para poder comprobar en el dispositivo qué versión está ejecutándose.
-const APP_BUILD = '2026-09-04.4';
+const APP_BUILD = '2026-09-11.1';
 
 const STORAGE = {
   TABLEROS: 'ag5_corte_tableros',
@@ -3618,8 +3693,9 @@ function packShelf(piezas, T_W, T_W_orig, T_H_orig, conVeta, gap, modo, ordenFn)
           h: hExt,
           refIdx: p.ref.refIdx,
           rot: rotExt,
-          largoOrig: p.ref.largo,
-          anchoOrig: p.ref.ancho
+          largoOrig: (p.ref.largoReal != null ? p.ref.largoReal : p.ref.largo),
+          anchoOrig: (p.ref.anchoReal != null ? p.ref.anchoReal : p.ref.ancho),
+          todoLargo: !!p.ref.todoLargo
         });
       }
     }
@@ -3773,8 +3849,9 @@ function packGuillotine(piezas, T_W, T_H, conVeta, gap, ordenFn, fit, split) {
       h: p.h - gap,
       refIdx: p.ref.refIdx,
       rot: p.rot,
-      largoOrig: p.ref.largo,
-      anchoOrig: p.ref.ancho
+      largoOrig: (p.ref.largoReal != null ? p.ref.largoReal : p.ref.largo),
+      anchoOrig: (p.ref.anchoReal != null ? p.ref.anchoReal : p.ref.ancho),
+      todoLargo: !!p.ref.todoLargo
     })),
     T_W,
     T_H,
@@ -3870,8 +3947,9 @@ function packGuillotineFill(piezas, T_W, T_H, conVeta, gap, fit, split) {
       h: p.h - gap,
       refIdx: p.ref.refIdx,
       rot: p.rot,
-      largoOrig: p.ref.largo,
-      anchoOrig: p.ref.ancho
+      largoOrig: (p.ref.largoReal != null ? p.ref.largoReal : p.ref.largo),
+      anchoOrig: (p.ref.anchoReal != null ? p.ref.anchoReal : p.ref.ancho),
+      todoLargo: !!p.ref.todoLargo
     })),
     T_W,
     T_H,
@@ -4174,6 +4252,47 @@ function esPiezaTableroEntero(p, tab) {
   return (eq(L, TL) && eq(A, TA)) || (eq(L, TA) && eq(A, TL));
 }
 
+/**
+ * PIEZA A TODO EL LARGO DEL TABLERO SIN SANEO (11-09-2026).
+ * A veces el cliente pide piezas de todo el largo del tablero (p. ej. 2800 en
+ * un tablero de 2800×2070), por el ancho que sea. Con el saneo de 15 mm por
+ * lado no caben en el área útil (2770), pero en la seccionadora se cortan
+ * igualmente: el operario NO sanea a lo largo (solo a lo ancho). Es una
+ * operación MANUAL en la máquina, así que la app la admite pero la marca
+ * con un aviso bien visible en Entrada manual, lista de corte, despiece y
+ * LEEME del Cutty.
+ *
+ * Criterio: una de las medidas de la pieza coincide (±0,5 mm) con el LARGO
+ * FÍSICO del tablero (con veta solo puede ser el largo de la pieza; sin veta
+ * también su ancho, porque se puede rotar), la otra medida cabe en el ancho
+ * útil con la demasía, hay saneo configurado (> 0) y no es tablero entero.
+ * Devuelve null si no aplica; si aplica, { largoReal, anchoPieza, largoUtil,
+ * largoPacking } donde largoPacking es el largo con el que entra al despiece
+ * (ocupa todo el largo útil, como una tira de lado a lado).
+ */
+function esPiezaTodoLargo(p, tab, cfg) {
+  if (!p || !tab || p.caj) return null;
+  if (esPiezaTableroEntero(p, tab)) return null;
+  const L  = parseFloat(p.largo)  || 0;
+  const A  = parseFloat(p.ancho)  || 0;
+  const TL = parseFloat(tab.largo) || 0;
+  const TA = parseFloat(tab.ancho) || 0;
+  if (L <= 0 || A <= 0 || TL <= 0 || TA <= 0) return null;
+  const c = cfg || (typeof config !== 'undefined' ? config : {}) || {};
+  const saneo = Math.max(0, c.saneoTablero != null ? c.saneoTablero : 15);
+  const gap   = Math.max(0, c.demasiaCorte != null ? c.demasiaCorte : 4);
+  if (saneo <= 0) return null;                 // sin saneo la pieza cabe con normalidad
+  const UL = Math.max(100, TL - 2 * saneo);    // largo útil (mismo fallback que el packing)
+  const UA = Math.max(100, TA - 2 * saneo);    // ancho útil
+  const tol = 0.5;
+  let largoReal, anchoPieza;
+  if (Math.abs(L - TL) <= tol)                       { largoReal = L; anchoPieza = A; }
+  else if (!tab.conVeta && Math.abs(A - TL) <= tol)  { largoReal = A; anchoPieza = L; }
+  else return null;
+  if (anchoPieza + gap > UA) return null;       // el otro lado no cabe: fuera de tablero normal
+  return { largoReal, anchoPieza, largoUtil: UL, largoPacking: Math.max(1, UL - gap) };
+}
+
 function calcularGrupos(piezas, tableros, config) {
   const grupos = {};
   for (const p of piezas) {
@@ -4204,6 +4323,9 @@ function calcularGrupos(piezas, tableros, config) {
     // bin-packing, (3) suma tableros enteros directamente.
     const entera = !p.caj && esPiezaTableroEntero(p, grupos[key].material);
     p._tableroEntero = entera;
+    // PIEZA A TODO EL LARGO sin saneo (corte manual): se marca aquí; al
+    // packing entra ocupando todo el largo útil (ver expandidas).
+    p._todoLargo = entera ? null : esPiezaTodoLargo(p, grupos[key].material, config);
     if (entera) {
       const uds = Math.max(0, Math.round(cant));
       grupos[key].tablerosVentaEntera = (grupos[key].tablerosVentaEntera || 0) + uds;
@@ -4289,12 +4411,19 @@ function calcularGrupos(piezas, tableros, config) {
         // Los TABLEROS ENTEROS no pasan por la sierra: fuera del packing.
         if (p._tableroEntero) continue;
         const cant = Math.max(1, Math.round(p.cantidad || 1));
+        const tl = p._todoLargo || null;
         for (let k = 0; k < cant; k++) {
           expandidas.push({
             refIdx: p._idx ?? -1,    // referencia opcional a la pieza original
             descripcion: p.descripcion || '',
-            largo: p.largo,
-            ancho: p.ancho
+            // Pieza a TODO EL LARGO sin saneo: entra al despiece como una tira
+            // de todo el largo útil (de lado a lado), con su ancho real. La
+            // medida real (2800) se conserva en largoReal para etiquetas.
+            largo: tl ? tl.largoPacking : p.largo,
+            ancho: tl ? tl.anchoPieza  : p.ancho,
+            largoReal: tl ? tl.largoReal : p.largo,
+            anchoReal: tl ? tl.anchoPieza : p.ancho,
+            todoLargo: !!tl
           });
         }
       }
@@ -4720,6 +4849,37 @@ function renderPiezas() {
   tbody.innerHTML = piezas.map(p => filaPiezaHTML(p)).join('');
   // La banda de "piezas fuera del área útil" se reevalúa con cada render.
   actualizarBandaPiezasFuera();
+  actualizarBandaTodoLargo();
+}
+
+/** Piezas de la tabla que van a TODO EL LARGO del tablero sin saneo. */
+function listarPiezasTodoLargo() {
+  const out = [];
+  for (const p of piezas) {
+    const tab = tableros.find(t => t.id === p.materialId);
+    const tl = esPiezaTodoLargo(p, tab);
+    if (tl) out.push({ pieza: p, tablero: tab, info: tl });
+  }
+  return out;
+}
+/** Banda ámbar grande encima de la tabla de Entrada manual (11-09-2026). */
+function actualizarBandaTodoLargo() {
+  const el = document.getElementById('banda-aviso-todo-largo');
+  if (!el) return;
+  const lista = listarPiezasTodoLargo();
+  if (lista.length === 0) { el.classList.add('hide'); el.innerHTML = ''; return; }
+  const nPiezas = lista.reduce((s, x) => s + (parseInt(x.pieza.cantidad) || 1), 0);
+  const detalle = lista.slice(0, 4).map(x => {
+    const d = x.pieza.descripcion ? escapeHtml(x.pieza.descripcion) + ' ' : '';
+    return `${x.pieza.cantidad || 1} × ${d}${x.pieza.largo}×${x.pieza.ancho} (${escapeHtml(x.tablero.nombre)} ${x.tablero.largo}×${x.tablero.ancho})`;
+  }).join(' · ') + (lista.length > 4 ? ` · y ${lista.length - 4} más` : '');
+  el.innerHTML =
+    `<div class="btl-titulo">⚠ ${nPiezas} PIEZA${nPiezas === 1 ? '' : 'S'} A TODO EL LARGO DEL TABLERO — SIN SANEO A LO LARGO</div>` +
+    `<div class="btl-texto">Se admiten en el pedido, pero es un <strong>corte MANUAL en la seccionadora</strong>: ` +
+    `NO sanear a lo largo, solo a lo ancho. Cutty no las colocará con el saneo activo. ` +
+    `El aviso sale también en la lista de corte y en el LEEME del Cutty.</div>` +
+    `<div class="btl-detalle">${detalle}</div>`;
+  el.classList.remove('hide');
 }
 function filaPiezaHTML(p) {
   const matOptions = tableroOptionsHTML(p.materialId);
@@ -4745,14 +4905,20 @@ function filaPiezaHTML(p) {
   // app la interpreta como plancha completa (sin corte ni canteado).
   const enteraFila = !errores.fueraTablero && esPiezaTableroEntero(p, tab);
   if (enteraFila) clases.push('pieza-entera');
+  // Pieza a TODO EL LARGO del tablero sin saneo (corte manual): fila ámbar
+  // con la medida afectada resaltada; el aviso grande va en la banda de arriba.
+  const todoLargo = (!errores.fueraTablero && !enteraFila) ? esPiezaTodoLargo(p, tab) : null;
+  if (todoLargo) clases.push('pieza-todo-largo');
   const marcada = piezasMarcadas.has(p.id);
   if (marcada) clases.push('pieza-marcada');
   const trClase = clases.join(' ');
-  const tdLargoCls = errores.largoMal ? 'num td-fuera' : 'num';
-  const tdAnchoCls = errores.anchoMal ? 'num td-fuera' : 'num';
+  const L_esTodo = todoLargo && Math.abs((parseFloat(p.largo) || 0) - todoLargo.largoReal) <= 0.5;
+  const tdLargoCls = errores.largoMal ? 'num td-fuera' : (todoLargo && L_esTodo ? 'num td-todolargo' : 'num');
+  const tdAnchoCls = errores.anchoMal ? 'num td-fuera' : (todoLargo && !L_esTodo ? 'num td-todolargo' : 'num');
   const titleErr = errores.fueraTablero
     ? `title="⚠ Medidas fuera del tablero ${tab ? tab.nombre + ' (' + tab.largo + '×' + tab.ancho + ')' : ''}"`
-    : (enteraFila ? `title="Tablero entero: se vende la plancha completa, sin corte ni canteado"` : '');
+    : (enteraFila ? `title="Tablero entero: se vende la plancha completa, sin corte ni canteado"`
+    : (todoLargo ? `title="⚠ TODO EL LARGO del tablero (${todoLargo.largoReal} mm): NO sanear a lo largo, solo a lo ancho. Corte manual en la seccionadora."` : ''));
 
   return `
     <tr data-id="${p.id}" class="${trClase}" ${titleErr}>
@@ -4833,6 +4999,9 @@ function piezaFueraDelTablero(p, tab) {
   // (Mismo criterio que calcularGrupos: la pieza no entra en el packing y
   // suma un tablero entero, así que aviso y despiece siguen alineados.)
   if (esPiezaTableroEntero(p, tab)) return r;
+  // PIEZA A TODO EL LARGO sin saneo (11-09-2026): se admite con aviso, no es
+  // error. Mismo criterio que calcularGrupos (entra al packing como tira).
+  if (esPiezaTodoLargo(p, tab)) return r;
   // Área útil y gap: mismos valores y mismo fallback (mín. 100 mm) que en
   // calcularGrupos → despiezarBinPacking.
   const saneo = Math.max(0, (config && config.saneoTablero != null) ? config.saneoTablero : 15);
@@ -5164,7 +5333,7 @@ function renderTableros() {
                 <td class="num">${t.largo} × ${t.ancho}</td>
                 <td class="center"><span class="badge ${t.conVeta?'badge-veta':'badge-liso'}">${t.conVeta?'Con veta':'Liso'}</span></td>
                 <td class="center">${cantoBadge}</td>
-                <td class="num">${t.precioTablero != null ? t.precioTablero.toFixed(2) + ' €' : '—'}</td>
+                <td class="num">${t.precioTablero != null ? t.precioTablero.toFixed(2) + ' €' : '—'}${(typeof t.costeM2 === 'number' && !isNaN(t.costeM2)) ? `<div class="muted" style="font-size:10px;white-space:nowrap;" title="Precio de coste (compra al fabricante), por m²">coste ${t.costeM2.toFixed(2)} €/m²</div>` : ''}</td>
                 <td class="center" style="white-space:nowrap;">
                   <button class="btn-icon" onclick="cambiarStockTablero('${t.id}', -1)" title="Restar 1 tablero">−</button>
                   <strong style="display:inline-block;min-width:26px;cursor:pointer;${(t.stock||0)===0?'color:#9a8a72;':''}" onclick="fijarStockTablero('${t.id}')" title="Tocar para escribir el stock exacto">${fmtStock(t.stock)}</strong>
@@ -5201,6 +5370,8 @@ function openTableroModal(tablero) {
     : (tablero && esNombreRechapado(tablero.nombre) ? 'CHAPA' : 'PVC');
   document.getElementById('t-precio-tablero').value = tablero?.precioTablero ?? '';
   document.getElementById('t-precio-m2').value = tablero?.precioM2 ?? '';
+  const inpCoste = document.getElementById('t-coste-m2');
+  if (inpCoste) inpCoste.value = (typeof tablero?.costeM2 === 'number') ? tablero.costeM2 : '';
   const inpStock = document.getElementById('t-stock');
   if (inpStock) inpStock.value = tablero?.stock ?? 0;
   const inpDto = document.getElementById('t-dto-defecto');
@@ -5254,12 +5425,22 @@ function saveTablero() {
   // canto de chapa (0,4 mm) o de madera (2 mm), nunca PVC. Si se dejó el
   // PVC por defecto, se aplica chapa automáticamente.
   if (tipoCanto === 'PVC' && esNombreRechapado(nombre)) tipoCanto = 'CHAPA';
-  // Si hay precio €/tablero pero no €/m², lo calculamos para guardarlo
-  // como dato informativo.
-  if (precioTablero != null && (precioM2 == null || isNaN(precioM2))) {
+  // 11-09-2026: el dato que se escribe es el €/m² (así viene la tarifa del
+  // fabricante); el €/tablero se calcula = €/m² × área física, con 2
+  // decimales (igual que la tarifa: 14,77 × 5,796 = 85,61). Solo si una ficha
+  // antigua tiene €/tablero y no €/m², se deriva el €/m² para no perderlo.
+  {
     const areaM2 = largo * ancho / 1_000_000;
-    if (areaM2 > 0) precioM2 = +(precioTablero / areaM2).toFixed(2);
+    if (precioM2 != null && !isNaN(precioM2)) {
+      if (areaM2 > 0) precioTablero = +(precioM2 * areaM2).toFixed(2);
+    } else if (precioTablero != null && !isNaN(precioTablero)) {
+      if (areaM2 > 0) precioM2 = +(precioTablero / areaM2).toFixed(2);
+    }
   }
+  // Coste €/m² (compra al fabricante): informativo, null si está vacío.
+  const costeRaw = (document.getElementById('t-coste-m2')?.value ?? '').toString().trim().replace(',', '.');
+  let costeM2 = costeRaw === '' ? null : parseFloat(costeRaw);
+  if (costeM2 != null && (isNaN(costeM2) || costeM2 < 0)) costeM2 = null;
 
   const stockRaw = (document.getElementById('t-stock')?.value ?? '').toString().trim().replace(',', '.');
   let stock = stockRaw === '' ? 0 : parseFloat(stockRaw);
@@ -5275,11 +5456,11 @@ function saveTablero() {
 
   if (editTableroId) {
     const t = tableros.find(x => x.id === editTableroId);
-    Object.assign(t, { nombre, acabado, grueso, largo, ancho, conVeta, tipoCanto, precioTablero, precioM2, stock, dtoDefecto, mod: Date.now() });
+    Object.assign(t, { nombre, acabado, grueso, largo, ancho, conVeta, tipoCanto, precioTablero, precioM2, costeM2, stock, dtoDefecto, mod: Date.now() });
   } else {
     tableros.push({
       id: 't_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
-      nombre, acabado, grueso, largo, ancho, conVeta, tipoCanto, precioTablero, precioM2,
+      nombre, acabado, grueso, largo, ancho, conVeta, tipoCanto, precioTablero, precioM2, costeM2,
       stock, dtoDefecto, mod: Date.now()
     });
   }
@@ -5290,17 +5471,24 @@ function saveTablero() {
   toast('Tablero guardado', 'ok');
 }
 
-// Auto-cálculo del €/m² cuando cambia el €/tablero (informativo).
-document.addEventListener('input', e => {
-  if (e.target.id === 't-precio-tablero') {
-    const pt = parseFloat(e.target.value);
-    const l = parseFloat(document.getElementById('t-largo').value);
-    const a = parseFloat(document.getElementById('t-ancho').value);
-    if (pt > 0 && l > 0 && a > 0) {
-      const m2 = l * a / 1_000_000;
-      document.getElementById('t-precio-m2').value = m2 > 0 ? (pt / m2).toFixed(2) : '';
-    }
+// Auto-cálculo del €/tablero cuando cambia el €/m² (o las medidas del
+// tablero). Desde 11-09-2026 el sentido es este: €/m² → €/tablero; el
+// campo €/tablero es de solo lectura en el formulario.
+function recalcularPrecioTableroForm() {
+  const inpM2 = document.getElementById('t-precio-m2');
+  const inpPt = document.getElementById('t-precio-tablero');
+  if (!inpM2 || !inpPt) return;
+  const pm2 = parseFloat(String(inpM2.value).replace(',', '.'));
+  const l = parseFloat(document.getElementById('t-largo').value);
+  const a = parseFloat(document.getElementById('t-ancho').value);
+  if (String(inpM2.value).trim() === '') return;   // sin €/m² no tocamos el €/tablero (fichas antiguas)
+  if (pm2 >= 0 && l > 0 && a > 0) {
+    const m2 = l * a / 1_000_000;
+    inpPt.value = m2 > 0 ? (pm2 * m2).toFixed(2) : '';
   }
+}
+document.addEventListener('input', e => {
+  if (['t-precio-m2', 't-largo', 't-ancho'].includes(e.target.id)) recalcularPrecioTableroForm();
 });
 
 // ========== 7. EXCEL ==========
@@ -6991,10 +7179,12 @@ function renderResumen() {
       const entera = !!p._tableroEntero;
       const cantoP = entera ? 0 : p.cantidad * (p.cantosL * p.largo + p.cantosA * p.ancho) / 1000;
       const areaP = p.cantidad * p.largo * p.ancho / 1_000_000;
+      const todoL = !entera && !!p._todoLargo;
       const descP = escapeHtml(p.descripcion || '')
-        + (entera ? `${p.descripcion ? ' — ' : ''}<span style="color:#2e7d32;font-weight:700;">TABLERO ENTERO · sin corte ni canteado</span>` : '');
+        + (entera ? `${p.descripcion ? ' — ' : ''}<span style="color:#2e7d32;font-weight:700;">TABLERO ENTERO · sin corte ni canteado</span>` : '')
+        + (todoL ? `${p.descripcion ? ' — ' : ''}<span style="color:#b36b00;font-weight:700;">⚠ TODO EL LARGO · sin saneo a lo largo (corte manual)</span>` : '');
       return `
-        <tr${entera ? ' style="background:#edf5ec;"' : ''}>
+        <tr${entera ? ' style="background:#edf5ec;"' : (todoL ? ' style="background:#fff1cc;"' : '')}>
           <td class="num">${p.cantidad}</td>
           <td>${descP}</td>
           <td class="num">${p.largo}</td>
@@ -7116,13 +7306,13 @@ function renderPresupuestoEconomico(grupos) {
     <div class="presup-econ">
       ${(numeroPresupuestoActual || clienteActual || refClienteActual) ? `
       <div class="presup-cabecera-print">
-        ${numeroPresupuestoActual ? `<div class="pcp-numero">Presupuesto Nº ${escapeHtml(numeroPresupuestoActual)}</div>` : ''}
+        ${numeroPresupuestoActual ? `<div class="pcp-numero">${tipoProyectoActual === 'pedido' ? 'Pedido' : 'Presupuesto'} Nº ${escapeHtml(numeroPresupuestoActual)}</div>` : ''}
         ${clienteActual ? `<div class="pcp-cliente">${escapeHtml(clienteActual)}</div>` : ''}
         ${refClienteActual ? `<div class="pcp-refcliente">Ref. cliente: ${escapeHtml(refClienteActual)}</div>` : ''}
         <div class="pcp-fecha">Fecha: ${fechaPresTxt}</div>
       </div>` : ''}
       <div class="presup-header">
-        <h3>Presupuesto</h3>
+        <h3>${tipoProyectoActual === 'pedido' ? 'Pedido' : 'Presupuesto'}</h3>
         <div class="presup-controls no-print">
           <label class="presup-desc-input">
             Dto. tableros:
@@ -7846,7 +8036,7 @@ function renderTableroSVG(tab, num, material, gap, esMedio, saneo) {
   // Generar SVG con viewBox = dimensiones reales del tablero (mm).
   // Coordenadas relativas al ÁREA ÚTIL (van envueltas en un <g translate>).
   const piezasSVG = tab.piezas.map(p => {
-    const cls = p.rot ? 'despiece-piece despiece-piece-rotada' : 'despiece-piece';
+    const cls = (p.rot ? 'despiece-piece despiece-piece-rotada' : 'despiece-piece') + (p.todoLargo ? ' despiece-piece-todolargo' : '');
     const cx = p.x + p.w / 2;
     const cy = p.y + p.h / 2;
     // Etiqueta solo si la pieza es lo bastante grande
@@ -7860,7 +8050,7 @@ function renderTableroSVG(tab, num, material, gap, esMedio, saneo) {
       const txt = p.rot ? `${h}×${w}` : `${w}×${h}`;
       label = `<text class="despiece-piece-label" x="${cx}" y="${cy}" style="font-size:${fontSize}px;">${txt}</text>`;
     }
-    const tooltip = `${Math.round(p.largoOrig)}×${Math.round(p.anchoOrig)} mm${p.rot?' (rotada)':''}`;
+    const tooltip = `${Math.round(p.largoOrig)}×${Math.round(p.anchoOrig)} mm${p.rot?' (rotada)':''}${p.todoLargo?' · TODO EL LARGO sin saneo (corte manual)':''}`;
     return `<g><rect class="${cls}" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}"><title>${tooltip}</title></rect>${label}</g>`;
   }).join('');
 
@@ -8065,11 +8255,21 @@ function renderListaCorte(grupos) {
         cantoTxt = ` <span style="font-size:11px;color:#666;font-weight:400;">(canto ${nombreTipoCantoGrupo(g)})</span>`;
       }
     }
-    html += `<div class="lc-seccion"><h3>${titulo}${cantoTxt}</h3><table>`;
+    // Piezas a TODO EL LARGO del tablero sin saneo (corte manual): aviso
+    // grande al principio de la sección, además de la nota en cada fila.
+    const todoLargoSec = g.piezas.filter(p => !p._tableroEntero && p._todoLargo);
+    let avisoTL = '';
+    if (todoLargoSec.length > 0) {
+      const nTL = todoLargoSec.reduce((s, p) => s + (parseInt(p.cantidad) || 1), 0);
+      const largoTL = todoLargoSec[0]._todoLargo.largoReal;
+      avisoTL = `<div class="lc-aviso-todolargo">⚠ ATENCIÓN: ${nTL} PIEZA${nTL === 1 ? '' : 'S'} A TODO EL LARGO DEL TABLERO (${largoTL} mm) — NO SANEAR A LO LARGO, SOLO A LO ANCHO. CORTE MANUAL EN LA SECCIONADORA.</div>`;
+    }
+    html += `<div class="lc-seccion"><h3>${titulo}${cantoTxt}</h3>${avisoTL}<table>`;
     for (const p of g.piezas) {
       const cant = parseInt(p.cantidad) || 1;
       // Tablero entero: sin corte ni canteado → sin subrayado y con aviso.
       const entera = !!p._tableroEntero;
+      const todoL = !entera && !!p._todoLargo;
       // En DM las medidas NO se subrayan (no se cantea): el subrayado es solo
       // para canteado. La laca se anota aparte como texto.
       const medL = (esDM || entera) ? fmtMedida(p.largo, 0) : fmtMedida(p.largo, p.cantosL);
@@ -8089,9 +8289,13 @@ function renderListaCorte(grupos) {
           descTxt = descTxt ? `${descTxt} — ${nota}` : nota;
         }
       }
+      if (todoL) {
+        const notaTL = `<span class="lc-nota-todolargo">⚠ TODO EL LARGO · SIN SANEO A LO LARGO (corte manual)</span>`;
+        descTxt = descTxt ? `${descTxt} — ${notaTL}` : notaTL;
+      }
       const desc = descTxt ? `<td class="lc-desc">${descTxt}</td>` : '<td></td>';
       html += `
-        <tr>
+        <tr${todoL ? ' class="lc-fila-todolargo"' : ''}>
           <td class="lc-cant">${cant}</td>
           <td class="lc-sep">—</td>
           <td class="lc-medida">${medL} × ${medA}</td>
@@ -13435,6 +13639,27 @@ function construirLeemeTxt(numero, cliente, archivos) {
   txt += '   h) Manda a cortar.\r\n\r\n';
   txt += '3. Para la siguiente subcarpeta, vuelve al paso 2.a.\r\n';
   txt += '\r\n';
+
+  // Piezas a TODO EL LARGO del tablero sin saneo (11-09-2026): van al
+  // CUTLST00 con su medida real; con el saneo activo Cutty no las colocará.
+  // Se cortan a mano en la seccionadora, saneando solo a lo ancho.
+  const todoLargoLeeme = [];
+  for (const f of archivos) {
+    for (const p of f.piezas) {
+      if (p._todoLargo && !p._tableroEntero) {
+        todoLargoLeeme.push(`  - ${f.etiqueta}: ${parseInt(p.cantidad) || 1} x ${p.largo} x ${p.ancho}${p.descripcion ? ' (' + p.descripcion + ')' : ''}`);
+      }
+    }
+  }
+  if (todoLargoLeeme.length > 0) {
+    txt += '!!! ATENCIÓN: PIEZAS A TODO EL LARGO DEL TABLERO, SIN SANEO A LO LARGO !!!\r\n';
+    txt += '---------------------------------------------------------------------\r\n';
+    txt += 'Estas piezas miden lo mismo que el largo físico del tablero. Van en el\r\n';
+    txt += 'CUTLST00 con su medida real, pero con el saneo activo Cutty NO podrá\r\n';
+    txt += 'colocarlas: hay que cortarlas A MANO en la seccionadora, saneando SOLO\r\n';
+    txt += 'a lo ancho (nunca a lo largo).\r\n';
+    txt += todoLargoLeeme.join('\r\n') + '\r\n\r\n';
+  }
 
   txt += 'IMPORTANTE\r\n';
   txt += '----------\r\n';
