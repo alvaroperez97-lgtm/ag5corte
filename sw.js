@@ -23,7 +23,7 @@
    puerto 8055 del Servidor G5 (LAN), no solo a Tailscale.
    ============================================================ */
 
-const CACHE_VERSION = 'ag5-corte-20260911-130416';
+const CACHE_VERSION = 'ag5-corte-20260914-140833';
 
 const PRECACHE = [
   './',
