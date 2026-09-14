@@ -2277,6 +2277,8 @@ details.hist-arch.hide{display:none;}
     <!-- 11-09-2026: aviso grande de piezas a TODO EL LARGO del tablero sin
          saneo (corte manual en la seccionadora). Lo rellena renderPiezas(). -->
     <div id="banda-aviso-todo-largo" class="banda-aviso-todolargo hide"></div>
+    <!-- 14-09-2026 (QA H2): filas sin medidas, que no entran en el pedido. -->
+    <div id="banda-aviso-incompletas" class="banda-aviso-todolargo hide" style="border-color:#c9a227;"></div>
 
     <div class="table-wrap">
       <table id="tabla-piezas">
@@ -2482,7 +2484,7 @@ details.hist-arch.hide{display:none;}
           <input type="number" id="caj-f-ancho" min="150" step="1" placeholder="600" oninput="cajFormRefrescar()">
         </label>
         <label class="caj-lbl">Fondo exterior (mm)
-          <input type="number" id="caj-f-fondo" min="200" step="1" placeholder="550" oninput="cajFormRefrescar()">
+          <input type="number" id="caj-f-fondo" min="200" step="1" placeholder="550" oninput="cajAjustarGuiaAlFondo(); cajFormRefrescar()">
         </label>
         <label class="caj-lbl">Nº de cajones
           <select id="caj-f-ncaj" onchange="cajSetNumFrentes(parseInt(this.value)||1)">
@@ -3101,7 +3103,7 @@ details.hist-arch.hide{display:none;}
 // ========== 1. CONSTANTES Y ESTADO ==========
 // Versión de la app: sube con cada despliegue. Se muestra en Configuración
 // para poder comprobar en el dispositivo qué versión está ejecutándose.
-const APP_BUILD = '2026-09-11.2';
+const APP_BUILD = '2026-09-14.1';
 
 const STORAGE = {
   TABLEROS: 'ag5_corte_tableros',
@@ -3117,6 +3119,7 @@ const STORAGE = {
   ARTICULOS: 'ag5_corte_articulos',      // BBDD de artículos reutilizables (NO se limpia al abrir), compartida con el Servidor G5
   ARTICULOS_META: 'ag5_corte_articulos_meta',  // versión/estado de la sincronización de artículos
   BORRADOR_PREVIO: 'ag5_corte_borrador_anterior',  // B4: copia del borrador que el arranque limpio vació (red de seguridad)
+  CABECERA: 'ag5_corte_borrador_cab',              // 14-09-2026 (QA H7): cabecera del borrador (cliente, nº, descuentos, documento del servidor en edición) para sobrevivir a una recarga
   PEDIDOSFAB: 'ag5_corte_pedidosfab',             // pedidos a FABRICANTE pendientes de recibir (compartidos con el Servidor G5)
   PEDIDOSFAB_META: 'ag5_corte_pedidosfab_meta'    // versión/estado de su sincronización
 };
@@ -3399,6 +3402,7 @@ const piezasMarcadas = new Set();
 
 // ========== 2. PERSISTENCIA ==========
 function saveToStorage() {
+  guardarCabeceraBorrador();
   localStorage.setItem(STORAGE.PIEZAS, JSON.stringify(piezas));
   localStorage.setItem(STORAGE.CAJONERAS, JSON.stringify(cajoneras));
   localStorage.setItem(STORAGE.LINEAS, JSON.stringify(lineasLibres));
@@ -3512,6 +3516,81 @@ function loadFromStorage() {
     if (typeof pf.mod !== 'number' || isNaN(pf.mod)) pf.mod = 0;
   }
   loadPedidosFabMeta();
+}
+/**
+ * 14-09-2026 (QA H7): cabecera del borrador en pantalla. Las piezas ya
+ * sobrevivían a una recarga dentro de la misma sesión (botón «Actualizar
+ * app», refresco accidental), pero el descuento manual, el cliente, el nº y
+ * el documento del servidor en edición se perdían: el descuento volvía a
+ * 25/35 sin avisar y el siguiente «Guardar» creaba un documento NUEVO en vez
+ * de la revisión. Se guarda aquí y se restaura en el arranque (solo en la
+ * misma sesión: el arranque limpio la vacía como al resto del borrador).
+ */
+function guardarCabeceraBorrador() {
+  try {
+    const meta = { ...(proyectoMetaCargada || {}) };
+    localStorage.setItem(STORAGE.CABECERA, JSON.stringify({
+      descuento: descuentoActual,
+      descuentoCanto: descuentoCantoActual,
+      precioLaca: precioLacaActual,
+      modoFacturacion,
+      numero: numeroPresupuestoActual,
+      cliente: clienteActual,
+      refCliente: refClienteActual,
+      familia: familiaPedidoActual,
+      fecha: fechaPresupuestoActual,
+      tipo: tipoProyectoActual,
+      srv: proyectoQnActual ? {
+        qn: proyectoQnActual, rev: proyectoRevActual, linea: proyectoLineaActual,
+        soloLectura: !!proyectoSoloLectura, meta
+      } : null
+    }));
+  } catch (e) { /* cuota llena: la cabecera es solo comodidad */ }
+}
+function restaurarCabeceraBorrador() {
+  let b = null;
+  try { b = JSON.parse(localStorage.getItem(STORAGE.CABECERA)); } catch (e) { b = null; }
+  if (!b || typeof b !== 'object') return;
+  descuentoActual = (typeof b.descuento === 'number') ? b.descuento : null;
+  descuentoCantoActual = (typeof b.descuentoCanto === 'number') ? b.descuentoCanto : 0;
+  if (typeof b.precioLaca === 'number') precioLacaActual = b.precioLaca;
+  modoFacturacion = { ...(b.modoFacturacion || {}) };
+  numeroPresupuestoActual = b.numero || '';
+  clienteActual = b.cliente || '';
+  refClienteActual = b.refCliente || '';
+  familiaPedidoActual = (b.familia === 'cocina') ? 'cocina' : 'corte';
+  fechaPresupuestoActual = b.fecha || '';
+  tipoProyectoActual = b.tipo || '';
+  if (b.srv && b.srv.qn) {
+    proyectoQnActual = b.srv.qn;
+    proyectoRevActual = b.srv.rev || 0;
+    proyectoLineaActual = b.srv.linea || '';
+    proyectoSoloLectura = !!b.srv.soloLectura;
+    proyectoMetaCargada = { ...(b.srv.meta || {}) };
+  }
+}
+/** Tras una recarga en la misma sesión con un documento del servidor en
+ *  edición: se vuelve a pedir su bloqueo. Si lo tiene otro dispositivo, se
+ *  pasa a solo lectura con aviso (igual que al cargarlo). */
+async function reanudarBloqueoProyecto() {
+  if (!proyectoQnActual || proyectoSoloLectura || gestorBloqueoActual) return;
+  const qn = proyectoQnActual;
+  gestorBloqueoActual = ClienteG5.crearGestorBloqueo(qn, { alPerder: manejarPerdidaBloqueo });
+  try {
+    const rb = await gestorBloqueoActual.adquirir();
+    if (qn !== proyectoQnActual) return;   // mientras tanto se cargó otro documento
+    if (!rb.ok) {
+      gestorBloqueoActual = null;
+      proyectoSoloLectura = true;
+      const hora = rb.desde ? new Date(rb.desde).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '';
+      proyectoMetaCargada._motivoLectura = `abierto en ${rb.dispositivo || 'otro dispositivo'}${hora ? ` desde las ${hora}` : ''}`;
+      toast(`⚠ ${qn} lo está editando ${rb.dispositivo || 'otro dispositivo'}: has pasado a solo lectura`, 'err');
+    }
+  } catch (e) {
+    // Sin conexión: se sigue en edición; al guardar se reintentará el bloqueo.
+    gestorBloqueoActual = null;
+  }
+  actualizarBannerProyecto();
 }
 function getApiKey() { return localStorage.getItem(STORAGE.APIKEY) || ''; }
 function setApiKey(k) { localStorage.setItem(STORAGE.APIKEY, k); }
@@ -4641,14 +4720,24 @@ function setTab(name) {
 
 // ========== 5. ENTRADA MANUAL ==========
 function addPieza(data) {
+  // 14-09-2026 (QA H1): la fila nueva HEREDA material y grueso de la última
+  // fila de la tabla (las hojas manuscritas van por secciones de material, y
+  // con Enter al final se crea fila tras fila). Sin filas, el primer tablero
+  // de la BBDD con SU grueso real. Antes: grueso fijo 16 con tableros[0]
+  // (Blanco Soft III 10 mm) → el grupo salía como «16 mm» al precio del de
+  // 10 mm y la previsión de stock miraba el SKU equivocado.
+  const ultima = piezas.length ? piezas[piezas.length - 1] : null;
+  const tabDef = ultima
+    ? (tableros.find(t => t.id === ultima.materialId) || null)
+    : (tableros[0] || null);
   const p = {
     id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     cantidad: 1,
     descripcion: '',
     largo: 0,
     ancho: 0,
-    grueso: 16,
-    materialId: tableros[0]?.id || '',
+    grueso: tabDef ? tabDef.grueso : (ultima ? ultima.grueso : 16),
+    materialId: tabDef ? tabDef.id : (ultima ? (ultima.materialId || '') : ''),
     caras: 0,
     cantosL: 0,
     cantosA: 0,
@@ -4935,6 +5024,24 @@ function renderPiezas() {
   // La banda de "piezas fuera del área útil" se reevalúa con cada render.
   actualizarBandaPiezasFuera();
   actualizarBandaTodoLargo();
+  actualizarBandaIncompletas();
+}
+
+/** 14-09-2026 (QA H2): banda de filas sin medidas (no entran en el pedido). */
+function actualizarBandaIncompletas() {
+  const el = document.getElementById('banda-aviso-incompletas');
+  if (!el) return;
+  const inc = listarPiezasIncompletas();
+  if (inc.length === 0) { el.classList.add('hide'); el.innerHTML = ''; return; }
+  const detalle = inc.slice(0, 4).map(p => {
+    const d = p.descripcion ? escapeHtml(p.descripcion) + ' ' : '';
+    return `${p.cantidad || 1} × ${d}${p.largo || 0}×${p.ancho || 0}`;
+  }).join(' · ') + (inc.length > 4 ? ` · y ${inc.length - 4} más` : '');
+  el.innerHTML =
+    `<div class="btl-titulo">✎ ${inc.length} FILA${inc.length === 1 ? '' : 'S'} SIN MEDIDAS — NO ENTRA${inc.length === 1 ? '' : 'N'} EN EL PEDIDO</div>` +
+    `<div class="btl-texto">Rellena largo y ancho o elimina la fila (✕). Al guardar, imprimir o exportar se te pedirá quitarlas.</div>` +
+    `<div class="btl-detalle">${detalle}</div>`;
+  el.classList.remove('hide');
 }
 
 /** Piezas de la tabla que van a TODO EL LARGO del tablero sin saneo. */
@@ -4966,6 +5073,49 @@ function actualizarBandaTodoLargo() {
     `<div class="btl-detalle">${detalle}</div>`;
   el.classList.remove('hide');
 }
+/**
+ * 14-09-2026 (QA H3): estado visual de una fila (clases del <tr>, de las
+ * celdas de largo/ancho y el title), calculado en un solo sitio para que el
+ * pintado inicial (filaPiezaHTML) y el refresco EN VIVO al editar
+ * (refrescarEstadoFila) coincidan siempre.
+ */
+function estadoFilaPieza(p, tab) {
+  const errores = piezaFueraDelTablero(p, tab);
+  const clases = [];
+  if (errores.fueraTablero) clases.push('pieza-fuera-tablero');
+  const enteraFila = !errores.fueraTablero && esPiezaTableroEntero(p, tab);
+  if (enteraFila) clases.push('pieza-entera');
+  const todoLargo = (!errores.fueraTablero && !enteraFila) ? esPiezaTodoLargo(p, tab) : null;
+  if (todoLargo) clases.push('pieza-todo-largo');
+  if (piezasMarcadas.has(p.id)) clases.push('pieza-marcada');
+  const L_esTodo = todoLargo && Math.abs((parseFloat(p.largo) || 0) - todoLargo.largoReal) <= 0.5;
+  const tdLargoCls = errores.largoMal ? 'num td-fuera' : (todoLargo && L_esTodo ? 'num td-todolargo' : 'num');
+  const tdAnchoCls = errores.anchoMal ? 'num td-fuera' : (todoLargo && !L_esTodo ? 'num td-todolargo' : 'num');
+  const title = errores.fueraTablero
+    ? `⚠ Medidas fuera del tablero ${tab ? tab.nombre + ' (' + tab.largo + '×' + tab.ancho + ')' : ''}`
+    : (enteraFila ? `Tablero entero: se vende la plancha completa, sin corte ni canteado`
+    : (todoLargo ? `⚠ TODO EL LARGO del tablero (${todoLargo.largoReal} mm): NO sanear a lo largo, solo a lo ancho. Corte manual en la seccionadora.` : ''));
+  return { errores, enteraFila, todoLargo, trClase: clases.join(' '), tdLargoCls, tdAnchoCls, title };
+}
+
+/** Refresca en vivo el color/title de UNA fila sin repintar sus inputs
+ *  (repintar haría perder el foco a la operaria mientras escribe). */
+function refrescarEstadoFila(id) {
+  const p = piezas.find(x => x.id === id);
+  const tr = document.querySelector(`#tabla-piezas tbody tr[data-id="${id}"]`);
+  if (!p || !tr) return;
+  const tab = tableros.find(t => t.id === p.materialId);
+  const st = estadoFilaPieza(p, tab);
+  tr.className = st.trClase;
+  if (st.title) tr.setAttribute('title', st.title); else tr.removeAttribute('title');
+  const tds = tr.querySelectorAll('td');
+  // Orden de columnas: check · cant · pieza · largo · ancho · …
+  if (tds[3]) tds[3].className = st.tdLargoCls;
+  if (tds[4]) tds[4].className = st.tdAnchoCls;
+  actualizarBandaTodoLargo();
+  actualizarBandaIncompletas();
+}
+
 function filaPiezaHTML(p) {
   const matOptions = tableroOptionsHTML(p.materialId);
 
@@ -4980,30 +5130,17 @@ function filaPiezaHTML(p) {
   //         max(L,A) > max(largoT,anchoT)  ó  min(L,A) > min(largoT,anchoT)  →  fuera
   const tab = tableros.find(t => t.id === p.materialId);
   const esDM = esMaterialDM(tab);
-  const errores = piezaFueraDelTablero(p, tab);
-  // La fila puede combinar dos estados visuales:
+  // La fila puede combinar varios estados visuales (ver estadoFilaPieza):
   //   - pieza-fuera-tablero: alerta roja por medidas imposibles
+  //   - pieza-entera: plancha completa (venta de tablero entero)
+  //   - pieza-todo-largo: a todo el largo sin saneo (corte manual)
   //   - pieza-marcada: punteada por la operaria al revisar el pedido
-  const clases = [];
-  if (errores.fueraTablero) clases.push('pieza-fuera-tablero');
-  // Venta de tablero entero: fila en verde suave para que se vea que la
-  // app la interpreta como plancha completa (sin corte ni canteado).
-  const enteraFila = !errores.fueraTablero && esPiezaTableroEntero(p, tab);
-  if (enteraFila) clases.push('pieza-entera');
-  // Pieza a TODO EL LARGO del tablero sin saneo (corte manual): fila ámbar
-  // con la medida afectada resaltada; el aviso grande va en la banda de arriba.
-  const todoLargo = (!errores.fueraTablero && !enteraFila) ? esPiezaTodoLargo(p, tab) : null;
-  if (todoLargo) clases.push('pieza-todo-largo');
+  const st = estadoFilaPieza(p, tab);
   const marcada = piezasMarcadas.has(p.id);
-  if (marcada) clases.push('pieza-marcada');
-  const trClase = clases.join(' ');
-  const L_esTodo = todoLargo && Math.abs((parseFloat(p.largo) || 0) - todoLargo.largoReal) <= 0.5;
-  const tdLargoCls = errores.largoMal ? 'num td-fuera' : (todoLargo && L_esTodo ? 'num td-todolargo' : 'num');
-  const tdAnchoCls = errores.anchoMal ? 'num td-fuera' : (todoLargo && !L_esTodo ? 'num td-todolargo' : 'num');
-  const titleErr = errores.fueraTablero
-    ? `title="⚠ Medidas fuera del tablero ${tab ? tab.nombre + ' (' + tab.largo + '×' + tab.ancho + ')' : ''}"`
-    : (enteraFila ? `title="Tablero entero: se vende la plancha completa, sin corte ni canteado"`
-    : (todoLargo ? `title="⚠ TODO EL LARGO del tablero (${todoLargo.largoReal} mm): NO sanear a lo largo, solo a lo ancho. Corte manual en la seccionadora."` : ''));
+  const trClase = st.trClase;
+  const tdLargoCls = st.tdLargoCls;
+  const tdAnchoCls = st.tdAnchoCls;
+  const titleErr = st.title ? `title="${st.title}"` : '';
 
   return `
     <tr data-id="${p.id}" class="${trClase}" ${titleErr}>
@@ -5013,10 +5150,10 @@ function filaPiezaHTML(p) {
                onchange="togglePiezaMarcada('${p.id}', this.checked)"
                title="Marcar fila al puntear el pedido">
       </td>
-      <td class="num"><input type="number" inputmode="numeric" value="${p.cantidad}" min="1" onchange="updatePieza('${p.id}','cantidad',this.value)"></td>
+      <td class="num"><input type="number" inputmode="numeric" value="${p.cantidad}" min="1" onchange="updatePieza('${p.id}','cantidad',this.value,this)"></td>
       <td><input type="text" value="${escapeHtml(p.descripcion)}" placeholder="ej: Costado" onchange="updatePieza('${p.id}','descripcion',this.value)"></td>
-      <td class="${tdLargoCls}"><input type="number" inputmode="decimal" value="${p.largo}" min="0" onchange="updatePieza('${p.id}','largo',this.value)"></td>
-      <td class="${tdAnchoCls}"><input type="number" inputmode="decimal" value="${p.ancho}" min="0" onchange="updatePieza('${p.id}','ancho',this.value)"></td>
+      <td class="${tdLargoCls}"><input type="number" inputmode="decimal" value="${p.largo}" min="0" onchange="updatePieza('${p.id}','largo',this.value,this)"></td>
+      <td class="${tdAnchoCls}"><input type="number" inputmode="decimal" value="${p.ancho}" min="0" onchange="updatePieza('${p.id}','ancho',this.value,this)"></td>
       <td class="sub-cell center${esDM ? ' laca-cell' : ''}">${esDM ? `
         <select onchange="updatePieza('${p.id}','caras',this.value)"
                 title="Caras lacadas (0/1/2)">
@@ -5115,6 +5252,17 @@ function piezaFueraDelTablero(p, tab) {
   return r;
 }
 
+/** 14-09-2026 (QA H8): texto del área útil de un tablero para los avisos:
+ *  «Blanco Soft III 2800×2070 · útil 2770×2040, pieza máx. 2766×2036». */
+function txtTableroYUtil(tab) {
+  if (!tab) return '';
+  const saneo = Math.max(0, (config && config.saneoTablero != null) ? config.saneoTablero : 15);
+  const gap   = Math.max(0, (config && config.demasiaCorte  != null) ? config.demasiaCorte  : 4);
+  const UL = Math.max(100, (parseFloat(tab.largo) || 0) - 2 * saneo);
+  const UA = Math.max(100, (parseFloat(tab.ancho) || 0) - 2 * saneo);
+  return `${tab.nombre} ${tab.largo}×${tab.ancho} · útil ${UL}×${UA}, pieza máx. ${UL - gap}×${UA - gap}`;
+}
+
 /** Devuelve la lista de piezas con medidas fuera del tablero asignado. */
 function listarPiezasFueraTablero() {
   const fuera = [];
@@ -5134,13 +5282,27 @@ function listarPiezasFueraTablero() {
  */
 function validarPiezasFueraTablero(contexto) {
   contexto = contexto || 'al continuar';
+  // 0) 14-09-2026 (QA H2): filas sin medidas. No entran en el pedido; antes
+  //    de guardar/imprimir/exportar se pide quitarlas para que no queden en
+  //    el documento guardado como 0×0.
+  const incompletas = listarPiezasIncompletas();
+  if (incompletas.length > 0) {
+    const n = incompletas.length;
+    const muestras = incompletas.slice(0, 3).map(p => `${p.descripcion ? p.descripcion + ' ' : ''}${p.largo || 0}×${p.ancho || 0}`).join('; ');
+    const quitar = confirm(`Hay ${n} fila${n === 1 ? '' : 's'} sin medidas en Entrada manual (${muestras}${n > 3 ? '…' : ''}). ` +
+      `No entra${n === 1 ? '' : 'n'} en el pedido.\n\n¿Quitar esa${n === 1 ? '' : 's'} fila${n === 1 ? '' : 's'} y continuar?`);
+    if (!quitar) { setTab('manual'); return false; }
+    piezas = piezas.filter(p => !esPiezaIncompleta(p));
+    for (const p of incompletas) piezasMarcadas.delete(p.id);
+    saveToStorage();
+    renderPiezas();
+  }
   // 1) Piezas de la tabla de entrada con el criterio del packing (área útil).
   const fuera = listarPiezasFueraTablero();
   if (fuera.length > 0) {
     const muestras = fuera.slice(0, 3).map(f => {
       const desc = f.pieza.descripcion ? f.pieza.descripcion + ' ' : '';
-      const tabTxt = f.tablero ? `${f.tablero.nombre} ${f.tablero.largo}×${f.tablero.ancho}` : '';
-      return `${desc}${f.pieza.largo}×${f.pieza.ancho} (no cabe en ${tabTxt})`;
+      return `${desc}${f.pieza.largo}×${f.pieza.ancho} (no cabe en ${txtTableroYUtil(f.tablero)})`;
     });
     const masTxt = fuera.length > 3 ? ` y ${fuera.length - 3} más` : '';
     mostrarBandaPiezasFuera(
@@ -5203,8 +5365,7 @@ function actualizarBandaPiezasFuera() {
   if (fuera.length === 0) { el.classList.add('hide'); return; }
   const muestras = fuera.slice(0, 3).map(f => {
     const desc = f.pieza.descripcion ? f.pieza.descripcion + ' ' : '';
-    const tabTxt = f.tablero ? `${f.tablero.nombre} ${f.tablero.largo}×${f.tablero.ancho}` : '';
-    return `${desc}${f.pieza.largo}×${f.pieza.ancho} (no cabe en ${tabTxt})`;
+    return `${desc}${f.pieza.largo}×${f.pieza.ancho} (no cabe en ${txtTableroYUtil(f.tablero)})`;
   });
   const masTxt = fuera.length > 3 ? ` y ${fuera.length - 3} más` : '';
   el.innerHTML =
@@ -5221,7 +5382,7 @@ function tableroOptionsHTML(selectedId) {
     `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${escapeHtml(t.nombre)} · ${t.grueso}mm · ${t.largo}×${t.ancho}</option>`
   ).join('');
 }
-function updatePieza(id, field, value) {
+function updatePieza(id, field, value, el) {
   const p = piezas.find(x => x.id === id);
   if (!p) return;
   if (['cantidad','largo','ancho','grueso','caras','cantosL','cantosA'].includes(field)) {
@@ -5229,12 +5390,19 @@ function updatePieza(id, field, value) {
     if (num < 0) num = 0;                       // nunca valores negativos
     if (field === 'cantidad') num = Math.max(1, Math.round(num));  // cantidad: entero >= 1
     p[field] = num;
+    // 14-09-2026 (QA H4): si el valor se ha corregido (2,5 → 3, 0 → 1, −2 → 1),
+    // el input lo muestra al instante; antes seguía enseñando lo tecleado y
+    // se facturaba otra cosa hasta el siguiente repintado de la tabla.
+    if (el && el.value !== String(num)) el.value = num;
   } else {
     p[field] = value;
   }
   saveToStorage();
   // La banda de "piezas fuera del tablero" se recalcula en vivo al editar.
   actualizarBandaPiezasFuera();
+  // 14-09-2026 (QA H3): color de la fila (rojo/verde/ámbar) y bandas de
+  // «todo el largo» y de filas sin medidas también en vivo.
+  refrescarEstadoFila(id);
 }
 function updatePiezaMaterial(id, matId) {
   const p = piezas.find(x => x.id === id);
@@ -5250,9 +5418,14 @@ function updatePiezaMaterial(id, matId) {
     // (canteado ⇄ laca). Para no arrastrar valores que ya no significan lo mismo,
     // al cambiar de tipo reseteamos caras y cantos a 0.
     if (eraDM !== esDM) {
+      // 14-09-2026 (QA H9): si había cantos/caras marcados, se avisa: antes
+      // se ponían a 0 en silencio y la operaria no notaba que había perdido
+      // el canteado (o la laca) de esa fila.
+      const tenia = (p.caras || 0) + (p.cantosL || 0) + (p.cantosA || 0);
       p.caras = 0;
       p.cantosL = 0;
       p.cantosA = 0;
+      if (tenia > 0) toast(esDM ? 'Fila cambiada a DM: los cantos pasan a 0 (en DM la columna es laca). Revísala.' : 'Fila cambiada a melamina: la laca pasa a 0. Marca los cantos si los lleva.', 'err');
     }
     // La melamina nunca lleva laca en caras.
     if (!esDM) p.caras = 0;
@@ -6613,8 +6786,18 @@ function piezasDeCajoneras() {
 }
 
 /** Piezas del proyecto completo: entrada manual + despiece de cajoneras. */
+/** 14-09-2026 (QA H2): fila de Entrada manual sin largo o sin ancho. */
+function esPiezaIncompleta(p) {
+  if (!p || p.caj) return false;
+  return !((parseFloat(p.largo) || 0) > 0 && (parseFloat(p.ancho) || 0) > 0);
+}
+function listarPiezasIncompletas() { return piezas.filter(esPiezaIncompleta); }
 function piezasProyecto() {
-  return cajoneras.length ? [...piezas, ...piezasDeCajoneras()] : piezas;
+  // Las filas sin medidas (p. ej. la creada con Enter al final y no
+  // rellenada) NO entran en el cálculo, ni en la lista de corte ni en el
+  // Cutty. Se avisa en Entrada manual y se descartan al guardar/imprimir.
+  const validas = piezas.filter(p => !esPiezaIncompleta(p));
+  return cajoneras.length ? [...validas, ...piezasDeCajoneras()] : validas;
 }
 
 /**
@@ -6900,6 +7083,27 @@ function abrirFormCajonera(id) {
 function cerrarFormCajonera() {
   cajEditandoId = null;
   document.getElementById('caj-form').classList.add('hide');
+}
+
+/**
+ * 14-09-2026 (QA H6): si la guía seleccionada no cabe en el armazón
+ * (fondo − 25), se baja sola a la mayor guía DE STOCK que quepa (o a la
+ * mayor disponible si ninguna de stock cabe). Con fondo 500 la guía 500
+ * preseleccionada no cabía y la operaria tenía que corregirla a mano.
+ * Si la guía elegida ya cabe, se respeta (puede ser una elección manual).
+ */
+function cajAjustarGuiaAlFondo() {
+  const sel = document.getElementById('caj-f-guia');
+  const fondo = parseInt(document.getElementById('caj-f-fondo').value) || 0;
+  if (!sel || fondo <= 0) return;
+  const armazon = fondo - CAJ_CTE.descFondoArmazon;
+  const actual = parseInt(sel.value) || 0;
+  if (actual > 0 && actual <= armazon) return;
+  const caben = CAJ_CTE.guias.filter(g => g <= armazon).sort((a, b) => b - a);
+  if (!caben.length) return;
+  const stock = caben.filter(g => CAJ_CTE.guiasStock.includes(g));
+  const elegida = stock.length ? stock[0] : caben[0];
+  if ([...sel.options].some(o => parseInt(o.value) === elegida)) sel.value = String(elegida);
 }
 
 /** Refresco en vivo del croquis, precio, avisos y despiece del formulario. */
@@ -7469,14 +7673,14 @@ function renderPresupuestoEconomico(grupos) {
             <input type="number" id="presup-descuento-input" min="0" max="100" step="0.5"
                    value="${valT}" placeholder="25/35"
                    title="Vacío = descuento predefinido por material (25% melamina blanca / 35% resto). Escribe un % para forzarlo en TODAS las líneas de tablero (0 = sin descuento). Bórralo para volver al predefinido."
-                   oninput="onChangeDescuento(this.value)">
+                   oninput="onChangeDescuento(this.value)" onchange="onBlurDescuento(this, false)">
             <span>%</span>
           </label>
           <label class="presup-desc-input">
             Dto. canto:
             <input type="number" id="presup-descuento-canto-input" min="0" max="100" step="0.5"
                    value="${valC}" placeholder="0"
-                   oninput="onChangeDescuentoCanto(this.value)">
+                   oninput="onChangeDescuentoCanto(this.value)" onchange="onBlurDescuento(this, true)">
             <span>%</span>
           </label>
           ${hayLaca ? `
@@ -7581,6 +7785,7 @@ function calcularImporteGrupo(g) {
 function setModoFacturacion(clave, modo) {
   if (!clave) return;
   modoFacturacion[clave] = (modo === 'porArea') ? 'porArea' : 'medioTablero';
+  guardarCabeceraBorrador();   // QA H7
   if (window._gruposCache) renderCifrasPresupuesto(window._gruposCache);
 }
 
@@ -7832,6 +8037,7 @@ function onChangeDescuento(valor) {
   const txt = (valor || '').toString().replace(',', '.').trim();
   if (txt === '') {
     descuentoActual = null;
+    guardarCabeceraBorrador();
     if (window._gruposCache) renderCifrasPresupuesto(window._gruposCache);
     return;
   }
@@ -7839,9 +8045,19 @@ function onChangeDescuento(valor) {
   if (isNaN(v) || v < 0) v = 0;
   if (v > 100) v = 100;
   descuentoActual = v;
+  guardarCabeceraBorrador();   // QA H7: sobrevive a una recarga
   if (window._gruposCache) {
     renderCifrasPresupuesto(window._gruposCache);
   }
+}
+/** 14-09-2026: al salir del input (change), si el valor se ha recortado
+ *  (150 → 100, −5 → 0) se refleja en el input. En oninput no se toca para
+ *  que el cursor no salte. */
+function onBlurDescuento(inp, esCanto) {
+  const txt = (inp.value || '').toString().trim();
+  if (txt === '') { if (esCanto) descuentoCantoActual = 0; else descuentoActual = null; guardarCabeceraBorrador(); return; }
+  const v = esCanto ? descuentoCantoActual : descuentoActual;
+  if (typeof v === 'number' && String(v) !== txt.replace(',', '.')) inp.value = v;
 }
 
 /**
@@ -7859,6 +8075,7 @@ function onChangeDescuentoCanto(valor) {
   if (isNaN(v) || v < 0) v = 0;
   if (v > 100) v = 100;
   descuentoCantoActual = v;
+  guardarCabeceraBorrador();   // QA H7
   if (window._gruposCache) {
     renderCifrasPresupuesto(window._gruposCache);
   }
@@ -7875,6 +8092,7 @@ function onChangePrecioLaca(valor) {
   let v = txt === '' ? 0 : parseFloat(txt);
   if (isNaN(v) || v < 0) v = 0;
   precioLacaActual = v;
+  guardarCabeceraBorrador();   // QA H7
   if (window._gruposCache) {
     renderCifrasPresupuesto(window._gruposCache);
   }
@@ -7886,6 +8104,7 @@ function onChangePrecioLaca(valor) {
  */
 function setPrecioLaca(v) {
   precioLacaActual = Math.max(0, parseFloat(v) || 0);
+  guardarCabeceraBorrador();   // QA H7
   const inp = document.getElementById('presup-precio-laca-input');
   if (inp) inp.value = precioLacaActual;
   if (window._gruposCache) {
@@ -10973,6 +11192,7 @@ function mensajeErrorServidor(e) {
 
 // ── Banner de estado del proyecto (visible en todas las pestañas) ───────────
 function actualizarBannerProyecto() {
+  guardarCabeceraBorrador();   // QA H7: el estado del documento en edición sobrevive a una recarga
   const el = document.getElementById('srv-proyecto-banner');
   if (!el) return;
   if (proyectoQnActual) {
@@ -14159,6 +14379,7 @@ function confirmarExportarCutty() {
 
 // Inicialización al cargar
 loadFromStorage();
+restaurarCabeceraBorrador();   // 14-09-2026 (QA H7): cliente, nº, descuentos y documento en edición del borrador
 
 // ── ARRANQUE LIMPIO ─────────────────────────────────────────────────────
 // La entrada manual (piezas, cajoneras y líneas libres del borrador) debe
@@ -14212,6 +14433,13 @@ loadFromStorage();
     familiaPedidoActual = 'corte';
     fechaPresupuestoActual = '';
     tipoProyectoActual = '';
+    // 14-09-2026 (QA H7): la cabecera restaurada puede traer un documento
+    // del servidor en edición; en sesión nueva se olvida (sin bloqueo aún).
+    proyectoQnActual = '';
+    proyectoRevActual = 0;
+    proyectoLineaActual = '';
+    proyectoSoloLectura = false;
+    proyectoMetaCargada = {};
     saveToStorage();
   }
   try { sessionStorage.setItem(SESION_KEY, '1'); } catch (e) {}
@@ -14287,6 +14515,7 @@ function descartarBorradorPrevio() {
 // ── B4 · Recuperación del borrador (fin) ────────────────────────────────────
 
 loadServidorCfg();          // configuración del Servidor G5 (Tailscale)
+reanudarBloqueoProyecto();  // 14-09-2026 (QA H7): recarga con documento del servidor en edición → readquirir bloqueo
 aplicarEscalaFuente(config.escalaFuente);   // tamaño de letra configurable (Configuración)
 precargarTarifaSiVacia();
 retirarModelosDescatalogados();   // Textil 5 mm fuera (con lápida, 04-09-2026)
