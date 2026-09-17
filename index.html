@@ -1692,51 +1692,29 @@
       break-inside: avoid;
     }
 
-    /* ── Modo "COMPROBACIÓN CLIENTE" (desde 04-09-2026) ─────────────
+    /* ── Modo "COMPROBACIÓN CLIENTE" (desde 04-09-2026; sin hoja de
+       resumen desde 17-09-2026 a petición de Álvaro) ────────────────
        Activado añadiendo la clase 'print-comprobacion' al <body>.
        Documento para que el cliente revise su pedido ANTES de cortar:
-         · Hoja 1: cabecera (logo/cliente/expediente) + Resumen del
-           proyecto (tarjetas por material y totales del pedido).
-         · Hoja 2 en adelante: lista de corte completa con cantos
-           subrayados (y la hoja de montaje de cajoneras si las hay).
-       Sin importes, sin despiece visual ni detalle por material. */
-    body.print-comprobacion #resumen-content > *:not(#comprobacion-cabecera):not(#summary-grid):not(#totales-generales):not(#lista-corte) {
+       directo a la lista de corte completa con cantos subrayados (y la
+       hoja de montaje de cajoneras si las hay), con su propio
+       encabezado logo/cliente/expediente arriba como Hoja 1. Ya NO se
+       imprime la hoja previa de "Resumen del proyecto" (tarjetas por
+       material + totales del pedido). Sin importes, sin despiece
+       visual ni detalle por material. */
+    body.print-comprobacion #resumen-content > *:not(#lista-corte) {
       display: none !important;
     }
-    body.print-comprobacion #comprobacion-cabecera {
-      display: block !important;
-    }
     body.print-comprobacion #tab-resumen > .card > .card-header {
-      display: none !important;   /* el título va dentro de la cabecera */
+      display: none !important;
     }
-    body.print-comprobacion #comprobacion-cabecera .comp-titulo {
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 16px;
-      color: #000;
-      border-bottom: 2px solid #000;
-      padding-bottom: 4px;
-      margin: 0 0 10px 0;
-    }
-    body.print-comprobacion .summary-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    body.print-comprobacion .summary-card {
-      background: white;
-      border: 1px solid #333;
-      border-radius: 0;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-    body.print-comprobacion .summary-card h3,
-    body.print-comprobacion .summary-card .label,
-    body.print-comprobacion .summary-card .value {
-      color: #000;
-    }
-    body.print-comprobacion #totales-generales {
-      break-inside: avoid;
-      page-break-inside: avoid;
+    body.print-comprobacion .lista-corte-page {
+      /* Al quitar la hoja de resumen, la lista de corte pasa a ser la
+         Hoja 1: sin salto de página inicial (igual que en
+         print-solo-lista, ver arriba). */
+      page-break-before: avoid !important;
+      break-before: auto !important;
+      padding-top: 0 !important;
     }
   }
 
@@ -2569,9 +2547,11 @@ details.hist-arch.hide{display:none;}
            modelo y grosor. Solo en pantalla (no-print). -->
       <div id="aviso-stock"></div>
 
-      <!-- Cabecera (logo + cliente + expediente) de la hoja «Comprobación
-           cliente». Solo visible en ese modo de impresión. La rellena
-           renderListaCorte() con la misma cabecera de la lista de corte. -->
+      <!-- Cabecera (logo + cliente + expediente) de la hoja «Resumen del
+           proyecto» de Comprobación cliente. Esa hoja se quitó el
+           17-09-2026 (ver body.print-comprobacion): el div se queda sin
+           rellenar y oculto (display:none), por si se retoma más
+           adelante. La lista de corte usa su propio encabezado. -->
       <div id="comprobacion-cabecera"></div>
 
       <div class="summary-grid" id="summary-grid"></div>
@@ -3103,7 +3083,7 @@ details.hist-arch.hide{display:none;}
 // ========== 1. CONSTANTES Y ESTADO ==========
 // Versión de la app: sube con cada despliegue. Se muestra en Configuración
 // para poder comprobar en el dispositivo qué versión está ejecutándose.
-const APP_BUILD = '2026-09-14.1';
+const APP_BUILD = '2026-09-17.1';
 
 const STORAGE = {
   TABLEROS: 'ag5_corte_tableros',
@@ -8016,7 +7996,7 @@ function renderCifrasPresupuesto(grupos) {
       <button class="btn-primary" onclick="openGuardarPedidoModal()" style="background:var(--ag5-brown);" title="Guardar el proyecto como pedido en firme">📦 Guardar como pedido</button>
       <button class="btn-outline btn-imprimir" onclick="abrirExportarCuttyModal()" title="Exportar para Cutty / WinCut">📤 Exportar Cutty</button>
       <button class="btn-outline btn-imprimir" onclick="imprimirSoloListaCorte()" title="Imprimir únicamente la lista de corte (sin importes ni planos)">🖶 Imprimir lista de corte</button>
-      <button class="btn-outline btn-imprimir" onclick="imprimirComprobacionCliente()" title="Imprimir para que el cliente compruebe su pedido: resumen del proyecto + lista de corte, sin importes">🖶 Comprobación cliente</button>
+      <button class="btn-outline btn-imprimir" onclick="imprimirComprobacionCliente()" title="Imprimir para que el cliente compruebe su pedido: lista de corte completa, sin importes">🖶 Comprobación cliente</button>
       <button class="btn-outline btn-imprimir" onclick="imprimirPresupuesto(false)" title="Imprimir sin importes ni totales (resumen, detalle, despiece y lista de corte)">🖶 Imprimir sin valorar</button>
       <button class="btn-primary btn-imprimir" onclick="imprimirPresupuesto(true)" title="Imprimir solo el presupuesto valorado (bloque económico)">🖶 Imprimir valorado</button>
     </div>
@@ -8578,10 +8558,11 @@ function renderListaCorte(grupos) {
   `;
   let html = encabezadoHtml;
 
-  // La misma cabecera encabeza la hoja «Comprobación cliente» (resumen
-  // del proyecto), que se imprime antes de la lista de corte.
-  const cabComp = document.getElementById('comprobacion-cabecera');
-  if (cabComp) cabComp.innerHTML = encabezadoHtml + '<h2 class="comp-titulo">Resumen del proyecto</h2>';
+  // #comprobacion-cabecera ya NO se imprime (17-09-2026: se quitó la
+  // hoja de "Resumen del proyecto" de Comprobación cliente, que ahora
+  // usa directamente el encabezado de #lista-corte de más arriba). El
+  // div se deja sin rellenar: sigue en el HTML por si se retoma esa
+  // hoja más adelante, pero permanece oculto (display:none).
 
   // Cuadro resumen: tableros necesarios por material+grueso.
   // Se muestran solo los grupos con material asignado y nº de tableros
@@ -13388,12 +13369,14 @@ function imprimirSoloListaCorte() {
 // ========== 11e. IMPRIMIR COMPROBACIÓN CLIENTE ==========
 
 /**
- * Documento para que el CLIENTE compruebe su pedido antes de cortar:
- * cabecera con logo/cliente/expediente + Resumen del proyecto (tarjetas
- * por material y totales del pedido) en la primera hoja, y la lista de
- * corte completa (cantos subrayados; hoja de montaje de cajoneras si las
- * hay) a partir de la segunda. Sin importes, sin despiece visual ni
- * detalle por material. Clase auxiliar 'print-comprobacion' en <body>.
+ * Documento para que el CLIENTE compruebe su pedido antes de cortar: va
+ * directo a la lista de corte completa (cantos subrayados; hoja de montaje
+ * de cajoneras si las hay), con su propia cabecera logo/cliente/expediente
+ * arriba. Desde el 17-09-2026 ya NO lleva la hoja previa de "Resumen del
+ * proyecto" (tarjetas por material y totales): a petición de Álvaro se
+ * quitó esa hoja y el documento empieza directamente en la lista de corte.
+ * Sin importes, sin despiece visual ni detalle por material. Clase
+ * auxiliar 'print-comprobacion' en <body>.
  */
 function imprimirComprobacionCliente() {
   if (!validarPiezasFueraTablero('antes de imprimir')) return;
