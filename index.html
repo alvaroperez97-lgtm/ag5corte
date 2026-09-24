@@ -2004,6 +2004,10 @@ details.hist-arch summary{cursor:pointer;font-weight:700;font-size:13px;color:#7
 details.hist-arch.hide{display:none;}
 .srv-rev-item{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px;}
 @media print{#srv-proyecto-banner{display:none!important;}details.hist-arch{display:none!important;}}
+/* 24-09-2026: los avisos flotantes (toast) no salen NUNCA en papel. Al ser
+   position:fixed, el navegador los repetía en el pie de cada hoja (p. ej.
+   «Has pasado a solo lectura: el bloqueo de edición caducó»). */
+@media print{#toast{display:none!important;}}
 </style>
 <!-- ===== PWA: meta tags + iconos ===== -->
 <meta name="theme-color" content="#FF9600">
@@ -3104,7 +3108,7 @@ details.hist-arch.hide{display:none;}
 // ========== 1. CONSTANTES Y ESTADO ==========
 // Versión de la app: sube con cada despliegue. Se muestra en Configuración
 // para poder comprobar en el dispositivo qué versión está ejecutándose.
-const APP_BUILD = '2026-09-18.1';
+const APP_BUILD = '2026-09-24.1';
 
 const STORAGE = {
   TABLEROS: 'ag5_corte_tableros',
